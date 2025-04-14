@@ -1,3 +1,7 @@
 /MUCSNet.pth
 /__pycache__
-/.venv
+.venv/
+networks/
+*.pth
+
+data/
