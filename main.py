@@ -11,7 +11,7 @@ from scipy.interpolate import splprep, splev
 import customtkinter
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
 from tkinter import ttk, Toplevel
-sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
+# sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
@@ -476,5 +476,8 @@ class ContourEditor:
 
 if __name__=="__main__":
     root=customtkinter.CTk()
+    w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+    root.geometry("%dx%d+0+0" % (w, h))
+    
     app=ContourEditor(root)
     root.mainloop()
