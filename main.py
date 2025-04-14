@@ -1,16 +1,16 @@
 import os
-import sys
+# import sys
 import cv2
 import torch
-import math
+# import math
 import argparse
 import numpy as np
 from PIL import Image, ImageTk
 from constants import *
-from scipy.interpolate import splprep, splev
+# from scipy.interpolate import splprep, splev
 import customtkinter
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
-from tkinter import ttk, Toplevel
+# from tkinter import ttk, Toplevel
 # sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
