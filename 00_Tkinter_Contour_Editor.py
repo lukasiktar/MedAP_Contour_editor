@@ -1,47 +1,49 @@
+import os
+import sys
+import cv2
 import torch
+import math
+import argparse
+import numpy as np
+from PIL import Image, ImageTk
+from constants import *
+from scipy.interpolate import splprep, splev
 import customtkinter
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
 from tkinter import ttk, Toplevel
-from PIL import Image, ImageTk
-import cv2
-import sys
-import os
-import numpy as np
-from scipy.interpolate import splprep, splev
-import math
-from constants import *
-import argparse
-sys.path.append("/home/istrazivac/LukaSiktar/PRONOBIS/TransUNet")
+sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
-
 
 class ContourEditor:
     def __init__(self, root: customtkinter.CTk):
 
         #Segmentation model load
-        MODEL_PATH ="/home/istrazivac/LukaSiktar/PRONOBIS/MedAP_Contour_editor/MUCSNet.pth"
+        MODEL_PATH ="MUCSNet.pth"
         self.net = self.load_seg_model(MODEL_PATH)
-
+        #Root setup
         self.root=root
-        self.root.title("Contour Editor")
+        self.root.title("MedAP Contour Editor")
         self.root.configure(bg=COLOUR_ROOT_BG)
+        customtkinter.set_appearance_mode("dark")
 
         self.device= "cuda" if torch.cuda.is_available() else "cpu"
 
         #Initialize variables
         self.operational_image=None #Operational image
-        self.original_image=None  #Original image
-        self.tk_image=None        #Image format for canvas
+        self.original_image=None    #Original image
+        self.tk_image=None          #Image format for canvas
 
-        self.segmentation_performed=False
+        self.segmentation_performed=False   #Segmentaiton flag
+        self.points_for_segmentation=50
 
         #Zoom factors
         self.zoom_value = ZOOM_VALUE
         self.zoom_factor = ZOOM_FACTOR
         self.min_zoom = ZOOM_MIN
         self.max_zoom = ZOOM_MAX
+
         #Original image dimensions
         self.image_shape=None
 
@@ -59,7 +61,7 @@ class ContourEditor:
         button_frame =customtkinter.CTkFrame(root)
         button_frame.pack(side="right", fill="y", padx=30)
 
-        #Button
+        #Buttons
         self.load_button = customtkinter.CTkButton(button_frame,text="Load Dataset", font=(self.font_size,self.font_size), command=self.load_images)          
         self.save_button = customtkinter.CTkButton(button_frame, text="Save Annotation", font=(self.font_size,self.font_size), fg_color='green', hover_color="dark green", command=self.save_image)
         self.reset_button = customtkinter.CTkButton(button_frame, text="Reset Annotation", font=(self.font_size,self.font_size), command=self.reset_rectangle)
@@ -67,6 +69,7 @@ class ContourEditor:
         self.perform_segmentation_button = customtkinter.CTkButton(button_frame, text="Perform segmentation", font=(self.font_size,self.font_size), command=self.perform_segmentation)
         self.draw_empty_segmetation_button=customtkinter.CTkButton(button_frame, text="Empty Segmentation", font=(self.font_size,self.font_size), command=self.perform_empty_mask_segmentation)
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
+
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
         self.save_button.grid(row=1, column=0, ipadx=12, ipady=12, padx=20, pady=20,sticky="ew")
@@ -83,17 +86,33 @@ class ContourEditor:
         # Zoom controls (Zoom In, Zoom Out)
         self.zoom_in_button = customtkinter.CTkButton(second_frame, text="Zoom In", font=(self.font_size,self.font_size), fg_color='gray', hover_color="dark gray", command=self.zoom_in)
         self.zoom_out_button = customtkinter.CTkButton(second_frame, text="Zoom Out", font=(self.font_size,self.font_size), fg_color='gray', hover_color="dark gray", command=self.zoom_out)
-
         # Arrange zoom buttons horizontally
         self.zoom_in_button.grid(row=1, column=0,ipady=12, padx=30, pady=10,sticky="ew")
         self.zoom_out_button.grid(row=1, column=1, ipady=12, padx=30, pady=10,sticky="ew")
 
+        #Number of segmentation points
+        self.add_points_button = customtkinter.CTkButton(second_frame, text="Add points", font=(self.font_size,self.font_size), fg_color='gray', hover_color="dark gray", command=self.add_points_for_segmentation)
+        self.reduce_points_button = customtkinter.CTkButton(second_frame, text="Remove points", font=(self.font_size,self.font_size), fg_color='gray', hover_color="dark gray", command=self.reduce_points_for_segmentation)
+        # Arrange  buttons horizontally
+        self.add_points_button.grid(row=2, column=0,ipady=12, padx=30, pady=10,sticky="ew")
+        self.reduce_points_button.grid(row=2, column=1, ipady=12, padx=30, pady=10,sticky="ew")
+
+
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
-
+        
+    # Function to display the current slider value
+    def update_label(self, value):
+        self.value_label.config(text=f"Value: {value}")
 
     def load_seg_model(self,model_path) -> ViT_seg:
-        #Define arguments for MicroSegNet model initialization
+        """Define arguments for MicroSegNet model initialization
+        Args: model_path - path to the MUCSNet model
+
+        Outputs:
+            net[ViT_seg] - segmentation model
+        """
+
         parser = argparse.ArgumentParser()
         parser.add_argument('--vit_name', type=str, default='R50-ViT-B_16', help='select one vit model')
         parser.add_argument('--num_classes', type=int,default=1, help='output channel of network')
@@ -112,22 +131,30 @@ class ContourEditor:
             config_vit.patches.grid = (int(args.img_size/args.vit_patches_size), int(args.img_size/args.vit_patches_size))
         net = ViT_seg(config_vit, img_size=args.img_size, num_classes=config_vit.n_classes).cuda()
 
+        #Model
         net.load_state_dict(torch.load(model_path))
+        #Set model to eval mode
         net.eval()
         return net
 
+    #Method that initializes images dir load 
     def load_images(self) -> None:
-        """Load multiple images from a selected directory."""
+        """Load multiple images from a selected directory.
+        
+        Currently have the support for .jpeg, .jpg and .png images.
+        """
         directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
         if directory_path:
             # Filter for valid image files
             valid_extensions = {".jpeg", ".jpg", ".png"}
+            #Store the image paths to the list
             self.image_paths = [
                 os.path.join(directory_path, file)
                 for file in os.listdir(directory_path)
                 if os.path.splitext(file)[1].lower() in valid_extensions
             ]
             
+            #Load image by image
             if self.image_paths:
                 self.image_paths.sort()
                 self.current_image_index = 0
@@ -136,22 +163,26 @@ class ContourEditor:
             else:
                 print("No valid image files found in the selected directory.")
 
-    #Method that loads image file
+    #Method that loads the single image file
     def load_current_image(self) -> None:
         """Load the image based on the current_image_index."""
         torch.cuda.empty_cache()
+
         if self.current_image_index < len(self.image_paths):
+            #Store file path, name and dataset number
             file_path=self.image_paths[self.current_image_index]
             self.file_name=file_path.split("/")[-1]
             self.dataset_number=file_path.split("_")[-4].split("/")[-1]
-            print(f"Dataset_Number: {self.dataset_number}")
+            #Define names for stored original (img) images and masks (gt)
             self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.annotated_image_conunter}"
             self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.annotated_image_conunter}"
+
             self.annotated_image_conunter+=1
             #Set the canvas title
             self.root.title(self.original_image_name)
+
             if file_path:
-                #Load image with OpenCV
+                #Load image
                 self.operational_image=cv2.imread(file_path)
                 self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
                 #Store the original image shape
@@ -161,10 +192,10 @@ class ContourEditor:
                 #Starting zoom value
                 self.zoom_value=1.0
                 self.update_canvas()
-
                 self.segmentation_performed=False
-
+                #Inintialize the empty mask
                 self.empty_mask = []
+                #Perform the initial segmentaion using MUCSNet
                 self.perform_segmentation()
                
         else:
@@ -174,6 +205,7 @@ class ContourEditor:
     #Method that clears the annoator if there is no more images to annoatate
     def clear_all_images(self) -> None:
         """Clear all images and reset variables when there are no more images to process."""
+
         self.operational_image = None
         self.original_image = None
         self.annotated_image_real_size = None
@@ -182,10 +214,8 @@ class ContourEditor:
         self.image_paths = []
         self.current_image_index = 0
         self.zoom_value = 1.0
-
         # Clear the canvas or update the GUI accordingly
         self.canvas.delete("all")
-
         # Reset GUI window title or provide feedback
         self.root.title("No Images Loaded")
 
@@ -194,16 +224,17 @@ class ContourEditor:
         if self.segmentation_performed:
             for i, (x,y) in enumerate(self.segment.contour_points):
                 if abs((x+self.x) - event.x) < 5 and abs((y+self.y) - event.y) < 5:
-                    #print(f"Points: {self.points}")
-                    #print(f"{abs(x - event.x) < 5} , {abs(y - event.y)}")
                     self.selected_point=i
                     break
+                else:
+                    self.selected_point=None
 
     #Action performed while dragging
     def on_drag(self, event):
         if hasattr(self, "selected_point"):
-            self.segment.contour_points[self.selected_point]=[event.x-self.x, event.y-self.y]
-            self.draw_contour()
+            if self.selected_point is not None:
+                self.segment.contour_points[self.selected_point]=[event.x-self.x, event.y-self.y]
+                self.draw_contour()
             
     #Zoom in method
     def zoom_in(self) -> None:
@@ -217,6 +248,16 @@ class ContourEditor:
         self.zoom_value = max(self.zoom_value - self.zoom_factor, self.min_zoom)
         self.update_canvas()
 
+    #Add points for segmentation
+    def add_points_for_segmentation(self):
+        self.points_for_segmentation+=10
+        self.perform_segmentation()
+
+    #Reduce points for segmentation
+    def reduce_points_for_segmentation(self):
+        if self.points_for_segmentation > 20:
+            self.points_for_segmentation-=10
+        self.perform_segmentation()
     #Empty segmentation for case the input image does not show object
     def perform_empty_mask_segmentation(self)->None:
         if self.operational_image is not None:
@@ -227,12 +268,15 @@ class ContourEditor:
         torch.cuda.empty_cache()
 
         if self.operational_image is not None:
+            #Store the segmentation 
             self.segment = MUCSNet_Segmentator(self.zoomed_image,
                                                self.file_name,
                                                self.image_shape, 
-                                               self.net)
-        
+                                               self.net,
+                                               self.points_for_segmentation)
+            #Setup the segmentation performed flag
             self.segmentation_performed=True
+            #Replace the empty mask with the empty prediction if there are no contour points, else draw a contour on the canvas
             if self.segment.contour_points is None:
                 self.empty_mask=self.segment.prediction
             else:
@@ -263,23 +307,33 @@ class ContourEditor:
         if self.segment.contour_points is not None:
             for i, (x, y) in enumerate(self.segment.contour_points):
                 # Scale the contour points based on the zoom factor
-                x = int(x * self.zoom_value)
-                y = int(y * self.zoom_value)
-                
+                x = int(x )
+                y = int(y )
                 # Offset the points to align with the centered image
                 x += self.x
                 y += self.y
 
+                # Draw lines between consecutive points
+                line_width=6
+                prev_x = int(self.segment.contour_points[i - 1][0] ) + self.x
+                prev_y = int(self.segment.contour_points[i - 1][1] ) + self.y
+                self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
+                
+
+
+        if self.segment.contour_points is not None:
+            for i, (x, y) in enumerate(self.segment.contour_points):
+                # Scale the contour points based on the zoom factor
+                x = int(x )
+                y = int(y )
+                
+                # Offset the points to align with the centered image
+                x += self.x
+                y += self.y
                 # Draw points
                 cirlce_radius=8
                 self.canvas.create_oval(x - cirlce_radius, y - cirlce_radius, x + cirlce_radius, y + cirlce_radius, fill="blue", tags=f"point_{i}")
                 
-                # Draw lines between consecutive points
-                line_width=6
-                if i > 0:
-                    prev_x = int(self.segment.contour_points[i - 1][0] * self.zoom_value) + self.x
-                    prev_y = int(self.segment.contour_points[i - 1][1] * self.zoom_value) + self.y
-                    self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
 
 
     #Update the canvas method
@@ -359,10 +413,10 @@ class ContourEditor:
                 cv2.imwrite(mask_save_path, self.empty_mask)
                 self.empty_mask = []
 
-                # # Save the annotated image
-                # output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                # self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                # cv2.imwrite(output_image_path, self.annotated_image_real_size)
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path, self.annotated_image_real_size)
 
                 #Save original image
                 output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
@@ -398,8 +452,7 @@ class ContourEditor:
             #Reset the points coordinates     
             self.rect_start=None
             self.rect_end=None
-          
-
+        
             
             #Reset the segmentation mask to 0
             self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
@@ -413,8 +466,6 @@ class ContourEditor:
             #Empty the mask
             self.empty_mask = []
             self.previous_segment = None
-            # if self.query_box != None:
-            #     self.query_box.destroy()
             
             # Move to the next image
             self.current_image_index += 1

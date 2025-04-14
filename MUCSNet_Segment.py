@@ -7,7 +7,7 @@ from scipy.interpolate import splprep, splev
 
 
 class MUCSNet_Segmentator:
-    def __init__(self, zoomed_image, file_name, image_shape, net):
+    def __init__(self, zoomed_image, file_name, image_shape, net, points_for_segmentation):
 
         """The initialization of MUCSNet_Segmentator
         The Outputs:  self.prediction - the segmentation mask
@@ -18,6 +18,7 @@ class MUCSNet_Segmentator:
         self.filen_name=file_name
         self.image_shape=image_shape
         self.net=net
+        self.points_for_segmentation=points_for_segmentation
         
         patch_size=[224, 224]
         x, y = patch_size[0], patch_size[1]
@@ -74,7 +75,7 @@ class MUCSNet_Segmentator:
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splprep.html
                     tck, u = splprep([x_1,y_1], u=None, s=0.0, k=1, per=1)
                     # https://docs.scipy.org/doc/numpy-1.10.1/reference/generated/numpy.linspace.html
-                    u_new = np.linspace(u.min(), u.max(), 50)
+                    u_new = np.linspace(u.min(), u.max(), self.points_for_segmentation)
 
                     
                     # https://docs.scipy.org/doc/scipy-0.14.0/reference/generated/scipy.interpolate.splev.html
