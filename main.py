@@ -476,8 +476,10 @@ class ContourEditor:
 
 if __name__=="__main__":
     root=customtkinter.CTk()
-    w, h = root.winfo_screenwidth(), root.winfo_screenheight()
-    root.geometry("%dx%d+0+0" % (w, h))
+    
+    # maximize
+    # w, h = root.winfo_screenwidth(), root.winfo_screenheight()
+    # root.geometry("%dx%d+0+0" % (w, h))
     
     app=ContourEditor(root)
     root.mainloop()
