@@ -10,6 +10,8 @@ Annotation editor.
 - NVIDIA GPU with drivers installed
 - NVIDIA Container Toolkit ([Install Guide](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/install-guide.html))
 - X11 (on Linux) to forward GUI from container
+- Download 'networks' folder from [link](https://github.com/lukasiktar/TransUNet_custom)
+- Download model from [link](https://www.kaggle.com/models/lukaiktar/mucsnet_prostate) and name the file 'MUCSNet.pth'
 
 ---
 
