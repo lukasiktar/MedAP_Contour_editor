@@ -3,5 +3,5 @@
 .venv/
 networks/
 *.pth
-
+/AnnotatedDataset
 data/

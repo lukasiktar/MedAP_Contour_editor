@@ -1,5 +1,5 @@
 import os
-# import sys
+import sys
 import cv2
 import torch
 # import math
@@ -7,11 +7,12 @@ import argparse
 import numpy as np
 from PIL import Image, ImageTk
 from constants import *
-# from scipy.interpolate import splprep, splev
+from scipy.interpolate import splprep, splev
 import customtkinter
+from natsort import natsorted
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
-# from tkinter import ttk, Toplevel
-# sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
+#from tkinter import ttk, Toplevel
+sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
@@ -100,6 +101,12 @@ class ContourEditor:
 
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
+
+        #Create annotation 
+        os.makedirs(FOLDER_ANNOTATED, exist_ok=True)
+        os.makedirs(FOLDER_ORIGINAL_IMAGES, exist_ok=True)
+        os.makedirs(FOLDER_MASKS, exist_ok=True)
+        os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
         
     # Function to display the current slider value
     def update_label(self, value):
@@ -156,9 +163,9 @@ class ContourEditor:
             
             #Load image by image
             if self.image_paths:
-                self.image_paths.sort()
+                self.image_paths=natsorted(self.image_paths)
                 self.current_image_index = 0
-                self.annotated_image_conunter=0
+                #self.annotated_image_conunter=0
                 self.load_current_image()
             else:
                 print("No valid image files found in the selected directory.")
@@ -171,36 +178,88 @@ class ContourEditor:
         if self.current_image_index < len(self.image_paths):
             #Store file path, name and dataset number
             file_path=self.image_paths[self.current_image_index]
-            self.file_name=file_path.split("/")[-1]
-            self.dataset_number=file_path.split("_")[-4].split("/")[-1]
-            #Define names for stored original (img) images and masks (gt)
-            self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.annotated_image_conunter}"
-            self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.annotated_image_conunter}"
+            annotated_file_paths=os.listdir(FOLDER_ORIGINAL_IMAGES)
+            annotated_image_names=[]
+            for annotated_file_path in annotated_file_paths:
 
-            self.annotated_image_conunter+=1
-            #Set the canvas title
-            self.root.title(self.original_image_name)
+                annotated_dataset_number=annotated_file_path.split("_")[-4]
+                annotated_image_counter=annotated_file_path.split("_")[-1].split(".p")[0]
 
-            if file_path:
-                #Load image
-                self.operational_image=cv2.imread(file_path)
-                self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-                #Store the original image shape
-                self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
-                #Copy the original image of original shape
-                self.original_image=self.operational_image.copy()
-                #Starting zoom value
-                self.zoom_value=1.0
-                self.update_canvas()
-                self.segmentation_performed=False
-                #Inintialize the empty mask
-                self.empty_mask = []
-                #Perform the initial segmentaion using MUCSNet
-                self.perform_segmentation()
+                annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
+
+
+            print(annotated_image_names)
+
+            self.file_name=str(file_path.split("/")[-1])
+            self.dataset_number=str(file_path.split("_")[-3])
+            self.image_counter=str(file_path.split("_")[-2])
+            self.image_name=self.dataset_number+"_"+self.image_counter
+            print(self.image_name)
+
+            if annotated_image_names:
+                if str(self.image_name) not in annotated_image_names:
+                        #Define names for stored original (img) images and masks (gt)
+                        self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
+                        self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
+                        #self.annotated_image_conunter+=1
+                        #Set the canvas title
+                        self.root.title(self.original_image_name)
+
+                        if file_path:
+                            #Load image
+                            self.operational_image=cv2.imread(file_path)
+                            self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                            #Store the original image shape
+                            self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
+                            #Copy the original image of original shape
+                            self.original_image=self.operational_image.copy()
+                            #Starting zoom value
+                            self.zoom_value=1.0
+                            self.update_canvas()
+                            self.segmentation_performed=False
+                            #Inintialize the empty mask
+                            self.empty_mask = []
+                            #Perform the initial segmentaion using MUCSNet
+                            self.perform_segmentation()
+                else:
+                    self.current_image_index+=1
+                    self.load_next_image()
+                    pass
+         
+                
+            else:
+                #Define names for stored original (img) images and masks (gt)
+                    self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
+                    self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
+                    #self.annotated_image_conunter+=1
+                    #Set the canvas title
+                    self.root.title(self.original_image_name)
+
+                    if file_path:
+                        #Load image
+                        self.operational_image=cv2.imread(file_path)
+                        self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                        #Store the original image shape
+                        self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
+                        #Copy the original image of original shape
+                        self.original_image=self.operational_image.copy()
+                        #Starting zoom value
+                        self.zoom_value=1.0
+                        self.update_canvas()
+                        self.segmentation_performed=False
+                        #Inintialize the empty mask
+                        self.empty_mask = []
+                        #Perform the initial segmentaion using MUCSNet
+                        self.perform_segmentation()
+
                
         else:
             self.clear_all_images()
             messagebox.showwarning("Annotation info.","There is no more images to annotate!")
+
+
+    def load_next_image(self):
+        self.load_current_image()
     
     #Method that clears the annoator if there is no more images to annoatate
     def clear_all_images(self) -> None:
