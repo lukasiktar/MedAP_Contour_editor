@@ -4,8 +4,14 @@ MedAP Contour Editor is annotation platform for medical image segmentation.
 The platform utilizes deep learning segmentation models for pre-annotation process that reduces the annotator efforts.
 MedAP performs pre-annotation and stored the original image, segmentation mask and annotated image with created outer contour.
 
+![alt text](image.png)
+
+Main MedAP components:
+
 - GUI - [Tkinter](https://docs.python.org/3/library/tkinter.html) 
 - Deep Learning model - [MUCSNet](https://www.kaggle.com/models/lukaiktar/mucsnet_prostate) (modified MicroSegNet model for segmentation of whole prostate sweep)
+
+
 
 ---
 
