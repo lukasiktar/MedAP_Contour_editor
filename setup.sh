@@ -15,5 +15,5 @@ curl -s https://api.github.com/repos/lukasiktar/TransUNet_custom/contents/networ
     curl -sSL "$URL" -o "$DEST_DIR/$FILE"
     echo "Downloaded: $FILE"
   done
+"
 
-echo "All files downloaded into $DEST_DIR."

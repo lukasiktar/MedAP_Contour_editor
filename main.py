@@ -12,10 +12,10 @@ import customtkinter
 from natsort import natsorted
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
 #from tkinter import ttk, Toplevel
-# sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
+from Polygon_segmentator import Polygon_Segmentator
 
 class ContourEditor:
     def __init__(self, root: customtkinter.CTk):
@@ -51,6 +51,11 @@ class ContourEditor:
         #Tkinter font size
         self.font_size=FONT_SIZE
 
+        # Polygon variables
+        self.drawing_polygon = False
+        self.ready_for_first_polygon = True
+        self.polygon_points = []
+
         #Apperance mode
         customtkinter.set_appearance_mode('dark')
 
@@ -66,7 +71,7 @@ class ContourEditor:
         self.load_button = customtkinter.CTkButton(button_frame,text="Load Dataset", font=(self.font_size,self.font_size), command=self.load_images)          
         self.save_button = customtkinter.CTkButton(button_frame, text="Save Annotation", font=(self.font_size,self.font_size), fg_color='green', hover_color="dark green", command=self.save_image)
         self.reset_button = customtkinter.CTkButton(button_frame, text="Reset Annotation", font=(self.font_size,self.font_size), command=self.reset_rectangle)
-        #self.draw_polygon_button = customtkinter.CTkButton(button_frame, text="Draw Polygon", font=(self.font_size,self.font_size), command=self.start_polygon_drawing)
+        self.draw_polygon_button = customtkinter.CTkButton(button_frame, text="Draw Polygon", font=(self.font_size,self.font_size), command=self.start_polygon_drawing)
         self.perform_segmentation_button = customtkinter.CTkButton(button_frame, text="Perform segmentation", font=(self.font_size,self.font_size), command=self.perform_segmentation)
         self.draw_empty_segmetation_button=customtkinter.CTkButton(button_frame, text="Empty Segmentation", font=(self.font_size,self.font_size), command=self.perform_empty_mask_segmentation)
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
@@ -77,7 +82,7 @@ class ContourEditor:
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
         self.save_button.grid(row=1, column=0, ipadx=12, ipady=12, padx=20, pady=20,sticky="ew")
         self.reset_button.grid(row=2, column=0, padx=20, pady=10, sticky="ew")
-        #self.draw_polygon_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
+        self.draw_polygon_button.grid(row=3, column=0, padx=20, pady=10, sticky="ew")
         self.perform_segmentation_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
         self.draw_empty_segmetation_button.grid(row=5, column=0, padx=20, pady=20, sticky="ew")
         self.exit_button.grid(row=6, column=0, ipadx=12, ipady=12, padx=20, pady=30, sticky="ew")
@@ -197,13 +202,13 @@ class ContourEditor:
 
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
 
-            print(annotated_image_names)
+
 
             self.file_name=str(file_path.split("/")[-1])
             self.dataset_number=str(file_path.split("_")[-3])
             self.image_counter=str(file_path.split("_")[-2])
+            #Combined image name for sorting purposes
             self.image_name=self.dataset_number+"_"+self.image_counter
-            print(self.image_name)
 
             if annotated_image_names:
                 if str(self.image_name) not in annotated_image_names:
@@ -230,6 +235,11 @@ class ContourEditor:
                             self.empty_mask = []
                             #Perform the initial segmentaion using MUCSNet
                             self.perform_segmentation()
+
+                            #Setup the mask used for polygon drawing
+                            self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+                            self.drawing_polygon = False
+                            self.polygon_points.clear()
                 else:
                     self.current_image_index+=1
                     self.load_next_image()
@@ -261,10 +271,16 @@ class ContourEditor:
                         #Perform the initial segmentaion using MUCSNet
                         self.perform_segmentation()
 
+                        #Setup the mask used for polygon drawing
+                        self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+                        self.drawing_polygon = False
+                        self.polygon_points.clear()
+
                
         else:
             self.clear_all_images()
             messagebox.showwarning("Annotation info.","There is no more images to annotate!")
+
 
     def del_prev_image(self) -> None:
         '''
@@ -283,6 +299,7 @@ class ContourEditor:
 
         self.current_image_index -= 1
         self.load_current_image()
+
 
     def load_next_image(self):
         self.load_current_image()
@@ -333,6 +350,55 @@ class ContourEditor:
         self.zoom_value = max(self.zoom_value - self.zoom_factor, self.min_zoom)
         self.update_canvas()
 
+    #Start drawing a polygon
+    def start_polygon_drawing(self) -> None:
+        """Start polygon drawing mode."""
+        self.drawing_polygon = True
+        self.polygon_points.clear()
+        self.segment = None
+        if self.ready_for_first_polygon:
+            messagebox.showinfo("Polygon mode", "Click on the canvas to add vertices. Double-click to complete.")
+            #self.file_name=simpledialog.askstring("Polygon Mode", "Click on the canvas to add vertices. Double-click to complete. \n Enter the filename (without extension):")
+            self.ready_for_first_polygon=False
+            self.canvas.bind("<Button-1>", self.on_mouse_down)
+            self.canvas.bind("<Double-1>", self.on_double_click) 
+      
+      
+
+    #Mouse action methods:
+    def on_mouse_down(self, event) -> None:
+        if self.operational_image is not None:
+            x, y = int((event.x - self.x) / self.zoom_value), int((event.y - self.y) / self.zoom_value)
+            self.polygon_points.append((x, y))
+            self.update_canvas()
+
+    #Compplete the polygon on double click
+    def on_double_click(self, event) -> None:
+        """Complete the polygon when double-clicked."""
+        self.number_of_polygons=1
+        if self.drawing_polygon:
+            self.complete_polygon()
+            self.polygon=Polygon_Segmentator(self.zoomed_image, 
+                                                self.file_name, 
+                                                self.image_shape, 
+                                                self.polygon_points, 
+                                                self.mask)
+            self.polygon.create_polygon()
+
+    #Complete a polygon creation
+    def complete_polygon(self) -> None:
+        """Complete the polygon and stop polygon drawing mode."""
+        if len(self.polygon_points) < 3:
+            messagebox.showwarning("Polygon Error", "At least 3 points are needed to complete a polygon.")
+            return
+        messagebox.showinfo("Polygon", "Polygon created successfully.")
+
+        self.drawing_polygon = False
+        cv2.polylines(self.operational_image, [np.array(self.polygon_points)], isClosed=True, color=(255, 255, 255), thickness=2)
+        self.update_canvas()
+
+                
+                
     #Add points for segmentation
     def add_points_for_segmentation(self):
         self.points_for_segmentation+=10
@@ -343,6 +409,7 @@ class ContourEditor:
         if self.points_for_segmentation > 20:
             self.points_for_segmentation-=10
         self.perform_segmentation()
+    
     #Empty segmentation for case the input image does not show object
     def perform_empty_mask_segmentation(self)->None:
         if self.operational_image is not None:
@@ -366,7 +433,6 @@ class ContourEditor:
                 self.empty_mask=self.segment.prediction
             else:
                 self.draw_contour()
-
 
     #Draw the contour on the loaded image
     def draw_contour(self):
@@ -419,8 +485,6 @@ class ContourEditor:
                 cirlce_radius=8
                 self.canvas.create_oval(x - cirlce_radius, y - cirlce_radius, x + cirlce_radius, y + cirlce_radius, fill="blue", tags=f"point_{i}")
                 
-
-
     #Update the canvas method
     def update_canvas(self, crosshair=None)-> None :
         if self.operational_image is not None:
@@ -439,6 +503,15 @@ class ContourEditor:
             self.y = (canvas_height - self.zoomed_height) // 2
             #Display the image at central coordinates
             self.canvas.create_image(self.x,self.y,anchor="nw", image=self.tk_image)
+
+             # Draw temporary polygon while adding points
+            if self.drawing_polygon==True and self.polygon_points:
+                scaled_points = [(int(px * self.zoom_value) + self.x, int(py * self.zoom_value) + self.y) for px, py in self.polygon_points]
+                for i in range(1, len(scaled_points)):
+                        self.canvas.create_line(scaled_points[i - 1], scaled_points[i], fill="red", width=3)
+                if len(scaled_points) > 1:
+                        self.canvas.create_line(scaled_points[-1], scaled_points[0], fill="red", width=3)  # Close the loop
+
 
             #Display the cross for easier annotation
             if crosshair:
@@ -462,7 +535,6 @@ class ContourEditor:
             self.tk_image=ImageTk.PhotoImage(image=Image.fromarray(self.zoomed_image))
             self.canvas.create_image(self.x,self.y,anchor="nw", image=self.tk_image)
         
-
     #Reset the rectangle method (in case the user is not satisfied with the bounding box)
     def reset_rectangle(self) -> None:
         if self.operational_image is not None:
@@ -508,6 +580,8 @@ class ContourEditor:
                 self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
+
+
             elif self.segment != None:
                 #Save mask
                 mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
@@ -532,6 +606,22 @@ class ContourEditor:
                 output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
                 self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
+            
+            else:
+                #Save mask
+                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
+
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path, self.image1)
+
+                #Save original image
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+            
            
 
             #Reset the points coordinates     
