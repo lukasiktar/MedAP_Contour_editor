@@ -12,7 +12,7 @@ import customtkinter
 from natsort import natsorted
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
 #from tkinter import ttk, Toplevel
-sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
+# sys.path.append("/home/crta-hp-408/PRONOBIS/MicroSegNet/CRTA_MicroSegment/TransUNet")
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
@@ -99,8 +99,15 @@ class ContourEditor:
         self.reduce_points_button.grid(row=2, column=1, ipady=12, padx=30, pady=10,sticky="ew")
 
 
-        self.canvas.bind("<Button-1>", self.on_click)
-        self.canvas.bind("<B1-Motion>", self.on_drag)
+        # shortcuts
+        self.root.bind("s", lambda event: self.save_image())
+        self.root.bind("<Return>", lambda event: self.save_image())
+        self.root.bind("r", lambda event: self.reset_rectangle())
+        self.root.bind("p", lambda event: self.perform_segmentation())
+
+
+        # undo action list
+        self.undo_list = []
 
         #Create annotation 
         os.makedirs(FOLDER_ANNOTATED, exist_ok=True)
