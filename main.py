@@ -108,6 +108,8 @@ class ContourEditor:
 
 
         # shortcuts
+        self.canvas.bind("<Button-1>", self.on_click)
+        self.canvas.bind("<B1-Motion>", self.on_drag)
         self.root.bind("s", lambda event: self.save_image())
         self.root.bind("<Return>", lambda event: self.save_image())
         self.root.bind("r", lambda event: self.reset_rectangle())
