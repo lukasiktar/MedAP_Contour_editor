@@ -76,6 +76,8 @@ class ContourEditor:
         self.draw_empty_segmetation_button=customtkinter.CTkButton(button_frame, text="Empty Segmentation", font=(self.font_size,self.font_size), command=self.perform_empty_mask_segmentation)
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
+        self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
+
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
         self.save_button.grid(row=1, column=0, ipadx=12, ipady=12, padx=20, pady=20,sticky="ew")
@@ -84,6 +86,7 @@ class ContourEditor:
         self.perform_segmentation_button.grid(row=4, column=0, padx=20, pady=10, sticky="ew")
         self.draw_empty_segmetation_button.grid(row=5, column=0, padx=20, pady=20, sticky="ew")
         self.exit_button.grid(row=6, column=0, ipadx=12, ipady=12, padx=20, pady=30, sticky="ew")
+        self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
         second_frame = customtkinter.CTkFrame(button_frame)
@@ -104,8 +107,15 @@ class ContourEditor:
         self.reduce_points_button.grid(row=2, column=1, ipady=12, padx=30, pady=10,sticky="ew")
 
 
-        self.canvas.bind("<Button-1>", self.on_click)
-        self.canvas.bind("<B1-Motion>", self.on_drag)
+        # shortcuts
+        self.root.bind("s", lambda event: self.save_image())
+        self.root.bind("<Return>", lambda event: self.save_image())
+        self.root.bind("r", lambda event: self.reset_rectangle())
+        self.root.bind("p", lambda event: self.perform_segmentation())
+
+        # for undo action
+        self.prev_image_name = None
+
 
         #Create annotation 
         os.makedirs(FOLDER_ANNOTATED, exist_ok=True)
@@ -193,6 +203,7 @@ class ContourEditor:
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
 
 
+
             self.file_name=str(file_path.split("/")[-1])
             self.dataset_number=str(file_path.split("_")[-3])
             self.image_counter=str(file_path.split("_")[-2])
@@ -270,7 +281,26 @@ class ContourEditor:
             self.clear_all_images()
             messagebox.showwarning("Annotation info.","There is no more images to annotate!")
 
-    #In case the images the platform is trying to load is already loaded
+
+    def del_prev_image(self) -> None:
+        '''
+        Delete previously annotated image if fix is needed.
+        '''
+
+        if self.prev_image_name == None:
+            return
+        
+        os.remove(f'{FOLDER_ANNOTATIONS}/{self.prev_image_name}.png')
+        os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
+        prev_mask_name = self.prev_image_name.replace('img', 'gt')
+        os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+
+        self.prev_image_name = None
+
+        self.current_image_index -= 1
+        self.load_current_image()
+
+
     def load_next_image(self):
         self.load_current_image()
     
@@ -611,12 +641,15 @@ class ContourEditor:
             #Empty the mask
             self.empty_mask = []
             self.previous_segment = None
+
+            # store this as previous image
+            self.prev_image_name = self.original_image_name
             
             # Move to the next image
             self.current_image_index += 1
             self.load_current_image()
             
-    
+
 
 
 if __name__=="__main__":
