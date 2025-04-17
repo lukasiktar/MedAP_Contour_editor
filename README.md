@@ -29,7 +29,7 @@ Main MedAP components:
 ## Build Docker Image
 
 ```bash
-docker build -t docker-image:tag .
+docker build --network=host -t docker-image:tag .
 
 xhost +local:docker
 
