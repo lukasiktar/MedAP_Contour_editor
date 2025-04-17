@@ -9,8 +9,13 @@ from PIL import Image, ImageTk
 from constants import *
 from scipy.interpolate import splprep, splev
 import customtkinter
+import datetime
+
 from natsort import natsorted
 from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
+import pydicom
+from pydicom.dataset import FileDataset, FileMetaDataset
+from pydicom.uid import ExplicitVRLittleEndian, generate_uid
 #from tkinter import ttk, Toplevel
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
@@ -167,14 +172,16 @@ class ContourEditor:
         
         Currently have the support for .jpeg, .jpg and .png images.
         """
-        directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
-        if directory_path:
+        self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
+        self.mask_directory_path=f"{self.directory_path}_mask"
+        os.makedirs(self.mask_directory_path,exist_ok=True)
+        if self.directory_path:
             # Filter for valid image files
-            valid_extensions = {".jpeg", ".jpg", ".png"}
+            valid_extensions = {".jpeg", ".jpg", ".png", ".dcm"}
             #Store the image paths to the list
             self.image_paths = [
-                os.path.join(directory_path, file)
-                for file in os.listdir(directory_path)
+                os.path.join(self.directory_path, file)
+                for file in os.listdir(self.directory_path)
                 if os.path.splitext(file)[1].lower() in valid_extensions
             ]
             
@@ -194,21 +201,22 @@ class ContourEditor:
 
         if self.current_image_index < len(self.image_paths):
             #Store file path, name and dataset number
-            file_path=self.image_paths[self.current_image_index]
+            self.file_path=self.image_paths[self.current_image_index]
+            
             annotated_file_paths=os.listdir(FOLDER_ORIGINAL_IMAGES)
             annotated_image_names=[]
             for annotated_file_path in annotated_file_paths:
 
-                annotated_dataset_number=annotated_file_path.split("_")[-4]
+                annotated_dataset_number=annotated_file_path.split("_")[-2]
                 annotated_image_counter=annotated_file_path.split("_")[-1].split(".p")[0]
 
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
 
 
 
-            self.file_name=str(file_path.split("/")[-1])
-            self.dataset_number=str(file_path.split("_")[-3])
-            self.image_counter=str(file_path.split("_")[-2])
+            self.file_name=str(self.file_path.split("/")[-1])
+            self.dataset_number=str(self.file_path.split("_")[-3])
+            self.image_counter=str(self.file_path.split("_")[-2])
             #Combined image name for sorting purposes
             self.image_name=self.dataset_number+"_"+self.image_counter
 
@@ -220,10 +228,105 @@ class ContourEditor:
                         #self.annotated_image_conunter+=1
                         #Set the canvas title
                         self.root.title(self.original_image_name)
+                      
+                        if self.file_path:
+                            path=self.file_path.split(".")[-1]
+                            print(path)
+                            if self.file_path.split(".")[-1]=="dcm":
+                                self.image_counter=self.file_path.split("_")[-1].split(".")[0]
+                                print(self.image_counter)
+                                self.dicom_image_data=pydicom.dcmread(self.file_path)
+                                image_data=self.dicom_image_data.pixel_array
+                                self.operational_image=cv2.normalize(image_data, None, 0,255, cv2.NORM_MINMAX)
+                                self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
 
-                        if file_path:
+                                #Store the original image shape
+                                self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
+                                #Copy the original image of original shape
+                                self.original_image=self.operational_image.copy()
+                                #Starting zoom value
+                                #self.zoom_value=1.0
+                                self.update_canvas()
+                                self.segmentation_performed=False
+                                #Inintialize the empty mask
+                                self.empty_mask = []
+                                #Perform the initial segmentaion using MUCSNet
+                                self.perform_segmentation()
+
+                                #Setup the mask used for polygon drawing
+                                self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+                                self.drawing_polygon = False
+                                self.polygon_points.clear()
+        
+
+
+                            else:
+                                #Load image
+                                self.operational_image=cv2.imread(self.file_path)
+                                self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                                #Store the original image shape
+                                self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
+                                #Copy the original image of original shape
+                                self.original_image=self.operational_image.copy()
+                                #Starting zoom value
+                                #self.zoom_value=1.0
+                                self.update_canvas()
+                                self.segmentation_performed=False
+                                #Inintialize the empty mask
+                                self.empty_mask = []
+                                #Perform the initial segmentaion using MUCSNet
+                                self.perform_segmentation()
+
+                                #Setup the mask used for polygon drawing
+                                self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+                                self.drawing_polygon = False
+                                self.polygon_points.clear()
+                else:
+                    self.current_image_index+=1
+                    self.load_next_image()
+                    pass
+         
+                
+            else:
+                #Define names for stored original (img) images and masks (gt)
+                    self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
+                    self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
+                    #self.annotated_image_conunter+=1
+                    #Set the canvas title
+                    self.root.title(self.original_image_name)
+
+                    if self.file_path:
+                        if self.file_path.split(".")[-1]=="dcm":
+                                self.image_counter=self.file_path.split("_")[-1].split(".")[0]
+                                print(self.image_counter)
+                                self.dicom_image_data=pydicom.dcmread(self.file_path)
+                                image_data=self.dicom_image_data.pixel_array
+                                self.operational_image=cv2.normalize(image_data, None, 0,255, cv2.NORM_MINMAX)
+                                self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+
+                                #Store the original image shape
+                                self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
+                                #Copy the original image of original shape
+                                self.original_image=self.operational_image.copy()
+                                #Starting zoom value
+                                #self.zoom_value=1.0
+                                self.update_canvas()
+                                self.segmentation_performed=False
+                                #Inintialize the empty mask
+                                self.empty_mask = []
+                                #Perform the initial segmentaion using MUCSNet
+                                self.perform_segmentation()
+
+                                #Setup the mask used for polygon drawing
+                                self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+                                self.drawing_polygon = False
+                                self.polygon_points.clear()
+        
+
+
+                        else:
                             #Load image
-                            self.operational_image=cv2.imread(file_path)
+                            self.operational_image=cv2.imread(self.file_path)
                             self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
                             #Store the original image shape
                             self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
@@ -242,41 +345,6 @@ class ContourEditor:
                             self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
                             self.drawing_polygon = False
                             self.polygon_points.clear()
-                else:
-                    self.current_image_index+=1
-                    self.load_next_image()
-                    pass
-         
-                
-            else:
-                #Define names for stored original (img) images and masks (gt)
-                    self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
-                    self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
-                    #self.annotated_image_conunter+=1
-                    #Set the canvas title
-                    self.root.title(self.original_image_name)
-
-                    if file_path:
-                        #Load image
-                        self.operational_image=cv2.imread(file_path)
-                        self.operational_image=cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-                        #Store the original image shape
-                        self.image_shape=[self.operational_image.shape[1],self.operational_image.shape[0]] #width, height
-                        #Copy the original image of original shape
-                        self.original_image=self.operational_image.copy()
-                        #Starting zoom value
-                        self.zoom_value=1.0
-                        self.update_canvas()
-                        self.segmentation_performed=False
-                        #Inintialize the empty mask
-                        self.empty_mask = []
-                        #Perform the initial segmentaion using MUCSNet
-                        self.perform_segmentation()
-
-                        #Setup the mask used for polygon drawing
-                        self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
-                        self.drawing_polygon = False
-                        self.polygon_points.clear()
 
                
         else:
@@ -566,65 +634,143 @@ class ContourEditor:
         if self.operational_image is not None:
            
             if len(self.empty_mask)>1:
-                #Save empty mask
-                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                print(mask_save_path)
-                cv2.imwrite(mask_save_path, self.empty_mask)
-                self.empty_mask = []
+                if self.file_path.split(".")[-1]=="dcm":
+                    pass
 
-                # Save the annotated image
-                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path, self.annotated_image_real_size)
+                else:
+                    #Save empty mask
+                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                    print(mask_save_path)
+                    cv2.imwrite(mask_save_path, self.empty_mask)
+                    self.empty_mask = []
 
-                #Save original image
-                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                    # Save the annotated image
+                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                    self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
+
+                    #Save original image
+                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
 
 
             elif self.segment != None:
-                #Save mask
-                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
+                if self.file_path.split(".")[-1]=="dcm":
+                    #Save mask
+                    image_name_dcm=self.mask_image_name.split("/")[-1]
+                    mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}_{self.image_counter}.dcm"
+                    print(mask_save_path)
+                    x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
 
-                # Convert it back to the required format for OpenCV
-                res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
-                self.smoothened_contours=[]
-                self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
+                    # Convert it back to the required format for OpenCV
+                    res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+                    self.smoothened_contours=[]
+                    self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
-                self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-                self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
+                    self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+                    self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
 
-                cv2.imwrite(mask_save_path, self.mask)
-                
-                # Save the annotated image
-                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
-                cv2.imwrite(output_image_path, self.annotated_image_real_size)
+                    # Create file meta with original transfer syntax
+                    file_meta = FileMetaDataset()
+                    file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
+                    file_meta.MediaStorageSOPClassUID = self.dicom_image_data.SOPClassUID
+                    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+                    file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
 
-                #Save original image
-                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                    # Create new dataset inheriting original metadata
+                    ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
+                    
+                    # Copy all original metadata except pixel-related tags
+                    for elem in self.dicom_image_data:
+                        if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
+                            ds.add(elem)
+                    
+                    # Set mask-specific attributes
+                    ds.Rows, ds.Columns = self.mask.shape
+                    ds.SamplesPerPixel = 1
+                    ds.PhotometricInterpretation = "MONOCHROME2"
+                    ds.BitsStored = self.dicom_image_data.BitsStored
+                    ds.BitsAllocated = self.dicom_image_data.BitsAllocated
+                    ds.HighBit = self.dicom_image_data.HighBit
+                    ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
+                    
+                    # Set mask pixel data (ensure correct dtype)
+                    ds.PixelData = self.mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
+                    
+                    # Update required UIDs and timestamps
+                    ds.SOPInstanceUID = pydicom.uid.generate_uid()
+                    ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+                    ds.InstanceCreationDate = datetime.datetime.now().strftime('%Y%m%d')
+                    ds.InstanceCreationTime = datetime.datetime.now().strftime('%H%M%S')
+                    
+                    # Modify identification tags
+                    ds.SeriesDescription = "Segmentation Mask"
+                    #ds.SeriesNumber = str(int(self.dicom_image_data.SeriesNumber) + 1000) if hasattr(self.dicom_image_data, 'SeriesNumber') else "1000"
+                    
+                    # Set appropriate SOP Class (Secondary Capture)
+                    ds.SOPClassUID = "1.2.840.10008.5.1.4.1.1.7"  # Secondary Capture Image Storage
+                    
+                    # Save the new DICOM file
+                    ds.save_as(mask_save_path)
+
+                    #Save the original image
+                    #Save original image
+                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{image_name_dcm}_{self.image_counter}.png"
+                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
+
+
+                    # Save the annotated image
+                    output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
+                    self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
+                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
+                else:
+                    #Save mask
+                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                    x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
+
+                    # Convert it back to the required format for OpenCV
+                    res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+                    self.smoothened_contours=[]
+                    self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
+
+                    self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+                    self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
+
+                    cv2.imwrite(mask_save_path, self.mask)
+                    
+                    # Save the annotated image
+                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                    self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
+                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
+
+                    #Save original image
+                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
             
             else:
-                #Save mask
-                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
+                if self.file_path.split(".")[-1]=="dcm":
+                    pass
 
-                # Save the annotated image
-                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path, self.image1)
+                else:
+                    #Save mask
+                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                    cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
 
-                #Save original image
-                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                    # Save the annotated image
+                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                    self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path, self.image1)
+
+                    #Save original image
+                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                
             
-           
 
             #Reset the points coordinates     
             self.rect_start=None

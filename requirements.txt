@@ -10,3 +10,4 @@ albumentations==1.4.18
 customtkinter>=5.2.2
 ml_collections==1.0.0
 natsort==8.4.0
+pydicom==3.0.1
