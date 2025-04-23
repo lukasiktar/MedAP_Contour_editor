@@ -1,5 +1,5 @@
 import os
-import sys
+import json
 import cv2
 import torch
 # import math
@@ -25,6 +25,27 @@ from Polygon_segmentator import Polygon_Segmentator
 def annotator_menu_callback(choice):
     print(f'new annotator: {choice}')
 
+def load_stats(filepath):
+    try:
+        with open(filepath, 'r') as f:
+            return json.load(f)
+    except FileNotFoundError:
+        return {"total_segmented": 0, "last_run": None}
+
+def get_total_segmented(filepath):
+    stats = load_stats(filepath)
+    return stats['total_segmented']
+
+def save_stats(filepath, stats):
+    with open(filepath, 'w') as f:
+        json.dump(stats, f, indent=2)
+    
+def increment_segmented(filepath, count=1):
+    stats = load_stats(filepath)
+    stats['total_segmented'] += count
+    stats['last_run'] = datetime.datetime.now().isoformat()
+    save_stats(filepath, stats)
+
 class ContourEditor:
     def __init__(self, root: customtkinter.CTk):
 
@@ -37,7 +58,8 @@ class ContourEditor:
         self.root.configure(bg=COLOUR_ROOT_BG)
         customtkinter.set_appearance_mode("dark")
 
-        self.device= "cuda" if torch.cuda.is_available() else "cpu"
+        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         #Initialize variables
         self.operational_image=None #Operational image
@@ -178,7 +200,8 @@ class ContourEditor:
         
         Currently have the support for .jpeg, .jpg and .png images.
         """
-        self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
+        # self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
+        self.directory_path = './data'
         self.mask_directory_path=f"{self.directory_path}_mask"
         os.makedirs(self.mask_directory_path,exist_ok=True)
         if self.directory_path:
@@ -233,14 +256,15 @@ class ContourEditor:
                         self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
                         #self.annotated_image_conunter+=1
                         #Set the canvas title
-                        self.root.title(self.original_image_name)
+                        # self.root.title(self.original_image_name)
+                        self.root.title(f'Image {get_total_segmented(STATS_FILENAME)+1}/TODO')
                       
                         if self.file_path:
                             path=self.file_path.split(".")[-1]
-                            print(path)
+                            # print(path)
                             if self.file_path.split(".")[-1]=="dcm":
                                 self.image_counter=self.file_path.split("_")[-1].split(".")[0]
-                                print(self.image_counter)
+                                # print(self.image_counter)
                                 self.dicom_image_data=pydicom.dcmread(self.file_path)
                                 image_data=self.dicom_image_data.pixel_array
                                 self.operational_image=cv2.normalize(image_data, None, 0,255, cv2.NORM_MINMAX)
@@ -304,7 +328,7 @@ class ContourEditor:
                     if self.file_path:
                         if self.file_path.split(".")[-1]=="dcm":
                                 self.image_counter=self.file_path.split("_")[-1].split(".")[0]
-                                print(self.image_counter)
+                                # print(self.image_counter)
                                 self.dicom_image_data=pydicom.dcmread(self.file_path)
                                 image_data=self.dicom_image_data.pixel_array
                                 self.operational_image=cv2.normalize(image_data, None, 0,255, cv2.NORM_MINMAX)
@@ -646,7 +670,7 @@ class ContourEditor:
                 else:
                     #Save empty mask
                     mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                    print(mask_save_path)
+                    # print(mask_save_path)
                     cv2.imwrite(mask_save_path, self.empty_mask)
                     self.empty_mask = []
 
@@ -667,7 +691,7 @@ class ContourEditor:
                     #Save mask
                     image_name_dcm=self.mask_image_name.split("/")[-1]
                     mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}_{self.image_counter}.dcm"
-                    print(mask_save_path)
+                    # print(mask_save_path)
                     x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
 
                     # Convert it back to the required format for OpenCV
@@ -777,6 +801,7 @@ class ContourEditor:
                     cv2.imwrite(output_image_path_original, self.original_image_rgb)
                 
             
+            increment_segmented('stats.json', count=1)
 
             #Reset the points coordinates     
             self.rect_start=None
