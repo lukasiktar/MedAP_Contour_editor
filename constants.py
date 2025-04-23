@@ -45,4 +45,4 @@ ZOOM_MIN = 0.5
 ZOOM_MAX = 5.0
 
 # DOCTORS WHICH ANNOTATE
-DOCTORS_OPTIONS = ['Hudolin', 'Kulis', 'Zekulic']
+DOCTORS_OPTIONS = ['Hudolin', 'Kulis', 'Zekulic', 'Sambolic', 'Andelic']
