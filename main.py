@@ -672,184 +672,178 @@ class ContourEditor:
         }
 
         with open(filepath, 'x') as f:
-            json.dump(data, f)
+            json.dump(data, f, indent=2)
         
 
     #Save the image method
+    # TODO check if method works; moved out of if clause, used return early
     def save_image(self) -> None:
         """Save the current image and move to next one."""
 
-        # TODO move out of if clause, use return early
-        if self.operational_image is not None:
+        if self.operational_image is None:
+            return
 
-            info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
-            self.save_image_info(info_path)
-
+        info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
+        self.save_image_info(info_path)
            
-            if len(self.empty_mask)>1:
-                if self.file_path.split(".")[-1]=="dcm":
-                    pass
+        if len(self.empty_mask)>1:
+            if self.file_path.split(".")[-1]!="dcm":
+                
+                #Save empty mask
+                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                # print(mask_save_path)
+                cv2.imwrite(mask_save_path, self.empty_mask)
+                self.empty_mask = []
 
-                else:
-                    #Save empty mask
-                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                    # print(mask_save_path)
-                    cv2.imwrite(mask_save_path, self.empty_mask)
-                    self.empty_mask = []
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path, self.annotated_image_real_size)
 
-                    # Save the annotated image
-                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                    self.annotated_image_real_size= cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
-
-                    #Save original image
-                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                #Save original image
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
 
+        elif self.segment != None:
+            if self.file_path.split(".")[-1]=="dcm":
+                #Save mask
+                image_name_dcm=self.mask_image_name.split("/")[-1]
+                mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}_{self.image_counter}.dcm"
+                # print(mask_save_path)
+                x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
 
-            elif self.segment != None:
-                if self.file_path.split(".")[-1]=="dcm":
-                    #Save mask
-                    image_name_dcm=self.mask_image_name.split("/")[-1]
-                    mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}_{self.image_counter}.dcm"
-                    # print(mask_save_path)
-                    x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
+                # Convert it back to the required format for OpenCV
+                res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+                self.smoothened_contours=[]
+                self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
-                    # Convert it back to the required format for OpenCV
-                    res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
-                    self.smoothened_contours=[]
-                    self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
+                self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+                self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
 
-                    self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-                    self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
+                # Create file meta with original transfer syntax
+                file_meta = FileMetaDataset()
+                file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
+                file_meta.MediaStorageSOPClassUID = self.dicom_image_data.SOPClassUID
+                file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+                file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
 
-                    # Create file meta with original transfer syntax
-                    file_meta = FileMetaDataset()
-                    file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
-                    file_meta.MediaStorageSOPClassUID = self.dicom_image_data.SOPClassUID
-                    file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
-                    file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
-
-                    # Create new dataset inheriting original metadata
-                    ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
+                # Create new dataset inheriting original metadata
+                ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
                     
-                    # Copy all original metadata except pixel-related tags
-                    for elem in self.dicom_image_data:
-                        if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
-                            ds.add(elem)
+                # Copy all original metadata except pixel-related tags
+                for elem in self.dicom_image_data:
+                    if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
+                        ds.add(elem)
+                
+                # Set mask-specific attributes
+                ds.Rows, ds.Columns = self.mask.shape
+                ds.SamplesPerPixel = 1
+                ds.PhotometricInterpretation = "MONOCHROME2"
+                ds.BitsStored = self.dicom_image_data.BitsStored
+                ds.BitsAllocated = self.dicom_image_data.BitsAllocated
+                ds.HighBit = self.dicom_image_data.HighBit
+                ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
                     
-                    # Set mask-specific attributes
-                    ds.Rows, ds.Columns = self.mask.shape
-                    ds.SamplesPerPixel = 1
-                    ds.PhotometricInterpretation = "MONOCHROME2"
-                    ds.BitsStored = self.dicom_image_data.BitsStored
-                    ds.BitsAllocated = self.dicom_image_data.BitsAllocated
-                    ds.HighBit = self.dicom_image_data.HighBit
-                    ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
-                    
-                    # Set mask pixel data (ensure correct dtype)
-                    ds.PixelData = self.mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
-                    
-                    # Update required UIDs and timestamps
-                    ds.SOPInstanceUID = pydicom.uid.generate_uid()
-                    ds.SeriesInstanceUID = pydicom.uid.generate_uid()
-                    ds.InstanceCreationDate = datetime.datetime.now().strftime('%Y%m%d')
-                    ds.InstanceCreationTime = datetime.datetime.now().strftime('%H%M%S')
-                    
-                    # Modify identification tags
-                    ds.SeriesDescription = "Segmentation Mask"
-                    #ds.SeriesNumber = str(int(self.dicom_image_data.SeriesNumber) + 1000) if hasattr(self.dicom_image_data, 'SeriesNumber') else "1000"
-                    
-                    # Set appropriate SOP Class (Secondary Capture)
-                    ds.SOPClassUID = "1.2.840.10008.5.1.4.1.1.7"  # Secondary Capture Image Storage
-                    
-                    # Save the new DICOM file
-                    ds.save_as(mask_save_path)
+                # Set mask pixel data (ensure correct dtype)
+                ds.PixelData = self.mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
+                
+                # Update required UIDs and timestamps
+                ds.SOPInstanceUID = pydicom.uid.generate_uid()
+                ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+                ds.InstanceCreationDate = datetime.datetime.now().strftime('%Y%m%d')
+                ds.InstanceCreationTime = datetime.datetime.now().strftime('%H%M%S')
+                
+                # Modify identification tags
+                ds.SeriesDescription = "Segmentation Mask"
+                #ds.SeriesNumber = str(int(self.dicom_image_data.SeriesNumber) + 1000) if hasattr(self.dicom_image_data, 'SeriesNumber') else "1000"
+                
+                # Set appropriate SOP Class (Secondary Capture)
+                ds.SOPClassUID = "1.2.840.10008.5.1.4.1.1.7"  # Secondary Capture Image Storage
+                
+                # Save the new DICOM file
+                ds.save_as(mask_save_path)
 
-                    #Save the original image
-                    #Save original image
-                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{image_name_dcm}_{self.image_counter}.png"
-                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                #Save the original image
+                #Save original image
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{image_name_dcm}_{self.image_counter}.png"
+                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
 
-                    # Save the annotated image
-                    output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
-                    self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
-                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
-                else:
-                    #Save mask
-                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                    x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
-
-                    # Convert it back to the required format for OpenCV
-                    res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
-                    self.smoothened_contours=[]
-                    self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
-
-                    self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-                    self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
-
-                    cv2.imwrite(mask_save_path, self.mask)
-                    
-                    # Save the annotated image
-                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                    self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
-                    cv2.imwrite(output_image_path, self.annotated_image_real_size)
-
-                    #Save original image
-                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
-            
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
+                self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
+                cv2.imwrite(output_image_path, self.annotated_image_real_size)
             else:
-                if self.file_path.split(".")[-1]=="dcm":
-                    pass
+                #Save mask
+                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
 
-                else:
-                    #Save mask
-                    mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                    cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
+                # Convert it back to the required format for OpenCV
+                res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+                self.smoothened_contours=[]
+                self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
-                    # Save the annotated image
-                    output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                    self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path, self.image1)
+                self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+                self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
+                cv2.imwrite(mask_save_path, self.mask)
+                    
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
+                cv2.imwrite(output_image_path, self.annotated_image_real_size)
 
-                    #Save original image
-                    output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                    self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                    cv2.imwrite(output_image_path_original, self.original_image_rgb)
+                #Save original image
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+            
+        else:
+            if self.file_path.split(".")[-1]!="dcm":
+                
+                #Save mask
+                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
+                cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
+
+                # Save the annotated image
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
+                self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path, self.image1)
+
+                #Save original image
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
+                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+                cv2.imwrite(output_image_path_original, self.original_image_rgb)
                 
             
-            increment_segmented('stats.json', count=1)
+        increment_segmented('stats.json', count=1)
 
-            #Reset the points coordinates     
-            self.rect_start=None
-            self.rect_end=None
+        #Reset the points coordinates     
+        self.rect_start=None
+        self.rect_end=None
+    
+        #Reset the segmentation mask to 0
+        self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
+
+        # Reset the operational image to the original
+        self.operational_image=None
+        self.original_image=None
+
+        #Reset all the masks
+        self.previous_mask=np.array([])
+
+        #Empty the mask
+        self.empty_mask = []
+        self.previous_segment = None
+
+        # store this as previous image
+        self.prev_image_name = self.original_image_name
         
-            
-            #Reset the segmentation mask to 0
-            self.mask = np.zeros((self.image_shape[1], self.image_shape[0]), dtype=np.uint8)
-            # Reset the operational image to the original
-            self.operational_image=None
-            self.original_image=None
-
-            #Reset all the masks
-            self.previous_mask=np.array([])
-
-            #Empty the mask
-            self.empty_mask = []
-            self.previous_segment = None
-
-            # store this as previous image
-            self.prev_image_name = self.original_image_name
-            
-            # Move to the next image
-            self.current_image_index += 1
-            self.load_current_image()
+        # Move to the next image
+        self.current_image_index += 1
+        self.load_current_image()
             
 
 
