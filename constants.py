@@ -44,5 +44,8 @@ ZOOM_FACTOR = 0.1
 ZOOM_MIN = 0.5
 ZOOM_MAX = 5.0
 
+#STATS FILE
+STATS_FILENAME = 'stats.json'
+
 # DOCTORS WHICH ANNOTATE
 DOCTORS_OPTIONS = ['Hudolin', 'Kulis', 'Zekulic', 'Sambolic', 'Andelic']
