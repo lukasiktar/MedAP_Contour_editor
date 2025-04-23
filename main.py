@@ -22,6 +22,9 @@ from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
 from Polygon_segmentator import Polygon_Segmentator
 
+def annotator_menu_callback(choice):
+    print(f'new annotator: {choice}')
+
 class ContourEditor:
     def __init__(self, root: customtkinter.CTk):
 
@@ -82,6 +85,7 @@ class ContourEditor:
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
+        self.annotator_button = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
 
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
@@ -92,6 +96,8 @@ class ContourEditor:
         self.draw_empty_segmetation_button.grid(row=5, column=0, padx=20, pady=20, sticky="ew")
         self.exit_button.grid(row=6, column=0, ipadx=12, ipady=12, padx=20, pady=30, sticky="ew")
         self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+
+        self.annotator_button.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
         second_frame = customtkinter.CTkFrame(button_frame)
