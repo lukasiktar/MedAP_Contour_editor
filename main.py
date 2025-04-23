@@ -660,10 +660,31 @@ class ContourEditor:
             # if self.query_box != None:
             #     self.query_box.destroy()
 
+    def save_image_info(self, filepath) -> None:
+        '''
+        Save information about annotator, cancer possibility time of annotation and other important stuff.
+        '''
+        # TODO test
+        data = {
+            "annotator": self.annotator_dropdown,
+            "lesion_probability": self.lesion_dropdown,
+            "time": datetime.datetime.now().isoformat()
+        }
+
+        with open(filepath, 'x') as f:
+            json.dump(data, f)
+        
+
     #Save the image method
     def save_image(self) -> None:
         """Save the current image and move to next one."""
+
+        # TODO move out of if clause, use return early
         if self.operational_image is not None:
+
+            info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
+            self.save_image_info(info_path)
+
            
             if len(self.empty_mask)>1:
                 if self.file_path.split(".")[-1]=="dcm":
