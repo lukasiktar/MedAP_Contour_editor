@@ -107,7 +107,8 @@ class ContourEditor:
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
-        self.annotator_button = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
+        self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
+        self.lesion_dropdown = customtkinter.CTkOptionMenu(button_frame, values=LESION_OPTIONS)
 
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
@@ -119,7 +120,8 @@ class ContourEditor:
         self.exit_button.grid(row=6, column=0, ipadx=12, ipady=12, padx=20, pady=30, sticky="ew")
         self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
-        self.annotator_button.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        self.annotator_dropdown.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        self.lesion_dropdown.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
         second_frame = customtkinter.CTkFrame(button_frame)
@@ -201,7 +203,7 @@ class ContourEditor:
         Currently have the support for .jpeg, .jpg and .png images.
         """
         # self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
-        self.directory_path = './data'
+        self.directory_path = FOLDER_DATA
         self.mask_directory_path=f"{self.directory_path}_mask"
         os.makedirs(self.mask_directory_path,exist_ok=True)
         if self.directory_path:

@@ -7,10 +7,12 @@ You can alter the values to change to look of the pdf.
 BUTTON_EXIT = 'q'
 
 # FOLDERS
+FOLDER_DATA = './data'
 FOLDER_ANNOTATED = 'AnnotatedDataset'
 FOLDER_MASKS = f'{FOLDER_ANNOTATED}/masks'
 FOLDER_ANNOTATIONS = f'{FOLDER_ANNOTATED}/annotations'
 FOLDER_ORIGINAL_IMAGES = f'{FOLDER_ANNOTATED}/input_images'
+FOLDER_INFORMATION = f'{FOLDER_ANNOTATED}/info'
 FOLDER_TXT = f'{FOLDER_ANNOTATED}/txt'
 
 #SPLASH IMAGE PATH
@@ -49,3 +51,5 @@ STATS_FILENAME = 'stats.json'
 
 # DOCTORS WHICH ANNOTATE
 DOCTORS_OPTIONS = ['Hudolin', 'Kulis', 'Zekulic', 'Sambolic', 'Andelic']
+# INFORMATION ABOUT IMAGE
+LESION_OPTIONS = ['Cancer', 'Not sure', 'No cancer']
