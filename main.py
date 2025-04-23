@@ -30,7 +30,7 @@ def load_stats(filepath):
         with open(filepath, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"total_segmented": 0, "last_run": None}
+        return {"total_segmented": 0, "last_update": None, "total_sessions": 0}
 
 def get_total_segmented(filepath):
     stats = load_stats(filepath)
@@ -39,11 +39,18 @@ def get_total_segmented(filepath):
 def save_stats(filepath, stats):
     with open(filepath, 'w') as f:
         json.dump(stats, f, indent=2)
+
+def update_stats_field(filepath, key, value):
+    data = load_stats(filepath)
+    data[key] = value
+    data['last_update'] = datetime.datetime.now().isoformat()
+    save_stats(filepath, data)
+    
     
 def increment_segmented(filepath, count=1):
     stats = load_stats(filepath)
     stats['total_segmented'] += count
-    stats['last_run'] = datetime.datetime.now().isoformat()
+    stats['last_update'] = datetime.datetime.now().isoformat()
     save_stats(filepath, stats)
 
 class ContourEditor:
