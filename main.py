@@ -2,21 +2,18 @@ import os
 import json
 import cv2
 import torch
-# import math
 import argparse
 import numpy as np
 from PIL import Image, ImageTk
 from constants import *
-from scipy.interpolate import splprep, splev
 import customtkinter
 import datetime
 
 from natsort import natsorted
-from tkinter import Tk, Label, Canvas, filedialog, messagebox, simpledialog
+from tkinter import Canvas, messagebox
 import pydicom
 from pydicom.dataset import FileDataset, FileMetaDataset
-from pydicom.uid import ExplicitVRLittleEndian, generate_uid
-#from tkinter import ttk, Toplevel
+
 from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
@@ -115,7 +112,8 @@ class ContourEditor:
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
         self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
-        self.lesion_checkbox = customtkinter.CTkCheckBox(button_frame, text='Interesting', onvalue="yes", offvalue="no")
+        self.interesting_checkbox_value = False
+        self.interesting_checkbox = customtkinter.CTkCheckBox(button_frame, text='Interesting')
 
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
@@ -128,7 +126,7 @@ class ContourEditor:
         self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         self.annotator_dropdown.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
-        self.lesion_checkbox.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        self.interesting_checkbox.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
         second_frame = customtkinter.CTkFrame(button_frame)
@@ -168,6 +166,11 @@ class ContourEditor:
         os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
         os.makedirs(FOLDER_PREMASKS, exist_ok=True)
         os.makedirs(FOLDER_INFORMATION, exist_ok=True)
+
+        # keep track of total number of session
+        stats = load_stats(STATS_FILENAME)
+        total_sessions = stats['total_sessions']
+        update_stats_field(STATS_FILENAME, 'total_sessions', total_sessions+1)
         
     # Function to display the current slider value
     def update_label(self, value):
@@ -685,9 +688,10 @@ class ContourEditor:
         '''
         Save information about annotator, cancer possibility time of annotation and other important stuff.
         '''
+        is_interesting = 'yes' if self.interesting_checkbox.get() else 'no'
         data = {
             "annotator": self.annotator_dropdown._current_value,
-            "lesion_probability": self.lesion_checkbox._variable,
+            "is_interesting": is_interesting,
             "time": datetime.datetime.now().isoformat()
         }
 
