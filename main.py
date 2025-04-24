@@ -166,6 +166,7 @@ class ContourEditor:
         os.makedirs(FOLDER_ORIGINAL_IMAGES, exist_ok=True)
         os.makedirs(FOLDER_MASKS, exist_ok=True)
         os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
+        os.makedir(FOLDER_PREANNOTATION, exist_ok=True)
         os.makedirs(FOLDER_INFORMATION, exist_ok=True)
         
     # Function to display the current slider value
@@ -672,7 +673,6 @@ class ContourEditor:
         '''
         Save information about annotator, cancer possibility time of annotation and other important stuff.
         '''
-        # TODO test
         data = {
             "annotator": self.annotator_dropdown._current_value,
             "lesion_probability": self.lesion_checkbox._variable,
@@ -684,7 +684,6 @@ class ContourEditor:
         
 
     #Save the image method
-    # TODO check if method works; moved out of if clause, used return early
     def save_image(self) -> None:
         """Save the current image and move to next one."""
 
