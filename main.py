@@ -65,8 +65,8 @@ class ContourEditor:
         self.root.configure(bg=COLOUR_ROOT_BG)
         customtkinter.set_appearance_mode("dark")
 
-        # self.device = "cuda" if torch.cuda.is_available() else "cpu"
-        self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+        self.device = "cuda" if torch.cuda.is_available() else "cpu"
+        #self.device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
         #Initialize variables
         self.operational_image=None #Operational image
@@ -115,7 +115,7 @@ class ContourEditor:
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
         self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
-        self.lesion_dropdown = customtkinter.CTkOptionMenu(button_frame, values=LESION_OPTIONS)
+        self.lesion_checkbox = customtkinter.CTkCheckBox(button_frame, text='Interesting', onvalue="yes", offvalue="no")
 
         # Arrange these buttons in the grid (1 column, multiple rows)
         self.load_button.grid(row=0, column=0, ipadx=12, ipady=12, padx=20, pady=10,sticky="ew")
@@ -128,7 +128,7 @@ class ContourEditor:
         self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         self.annotator_dropdown.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
-        self.lesion_dropdown.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        self.lesion_checkbox.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
         second_frame = customtkinter.CTkFrame(button_frame)
@@ -166,6 +166,7 @@ class ContourEditor:
         os.makedirs(FOLDER_ORIGINAL_IMAGES, exist_ok=True)
         os.makedirs(FOLDER_MASKS, exist_ok=True)
         os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
+        os.makedirs(FOLDER_INFORMATION, exist_ok=True)
         
     # Function to display the current slider value
     def update_label(self, value):
@@ -245,7 +246,7 @@ class ContourEditor:
             annotated_image_names=[]
             for annotated_file_path in annotated_file_paths:
 
-                annotated_dataset_number=annotated_file_path.split("_")[-2]
+                annotated_dataset_number=annotated_file_path.split("_")[-4]
                 annotated_image_counter=annotated_file_path.split("_")[-1].split(".p")[0]
 
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
@@ -261,8 +262,8 @@ class ContourEditor:
             if annotated_image_names:
                 if str(self.image_name) not in annotated_image_names:
                         #Define names for stored original (img) images and masks (gt)
-                        self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
-                        self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
+                        self.original_image_name=f"{self.dataset_number}_img_slice_{self.image_counter}"
+                        self.mask_image_name=f"{self.dataset_number}_gt_slice_{self.image_counter}"
                         #self.annotated_image_conunter+=1
                         #Set the canvas title
                         # self.root.title(self.original_image_name)
@@ -328,8 +329,8 @@ class ContourEditor:
                 
             else:
                 #Define names for stored original (img) images and masks (gt)
-                    self.original_image_name=f"microUS_{self.dataset_number}_img_slice_{self.image_counter}"
-                    self.mask_image_name=f"microUS_{self.dataset_number}_gt_slice_{self.image_counter}"
+                    self.original_image_name=f"{self.dataset_number}_img_slice_{self.image_counter}"
+                    self.mask_image_name=f"{self.dataset_number}_gt_slice_{self.image_counter}"
                     #self.annotated_image_conunter+=1
                     #Set the canvas title
                     self.root.title(self.original_image_name)
@@ -673,8 +674,8 @@ class ContourEditor:
         '''
         # TODO test
         data = {
-            "annotator": self.annotator_dropdown,
-            "lesion_probability": self.lesion_dropdown,
+            "annotator": self.annotator_dropdown._current_value,
+            "lesion_probability": self.lesion_checkbox._variable,
             "time": datetime.datetime.now().isoformat()
         }
 
@@ -692,7 +693,7 @@ class ContourEditor:
 
         info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
         self.save_image_info(info_path)
-           
+
         if len(self.empty_mask)>1:
             if self.file_path.split(".")[-1]!="dcm":
                 
@@ -738,7 +739,8 @@ class ContourEditor:
 
                 # Create new dataset inheriting original metadata
                 ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
-                    
+
+
                 # Copy all original metadata except pixel-related tags
                 for elem in self.dicom_image_data:
                     if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
@@ -752,7 +754,7 @@ class ContourEditor:
                 ds.BitsAllocated = self.dicom_image_data.BitsAllocated
                 ds.HighBit = self.dicom_image_data.HighBit
                 ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
-                    
+
                 # Set mask pixel data (ensure correct dtype)
                 ds.PixelData = self.mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
                 
@@ -779,6 +781,8 @@ class ContourEditor:
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
 
+
+
                 # Save the annotated image
                 output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
                 self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
@@ -796,7 +800,7 @@ class ContourEditor:
                 self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
                 self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
                 cv2.imwrite(mask_save_path, self.mask)
-                    
+
                 # Save the annotated image
                 output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
                 self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
@@ -806,7 +810,7 @@ class ContourEditor:
                 output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
                 self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
-            
+
         else:
             if self.file_path.split(".")[-1]!="dcm":
                 
