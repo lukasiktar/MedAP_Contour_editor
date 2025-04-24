@@ -92,10 +92,13 @@ class ContourEditor:
 
         #Apperance mode
         customtkinter.set_appearance_mode('dark')
+        
+        self.root.attributes('-zoomed', True)
 
         #Create GUI elements
-        self.canvas=Canvas(root, width=GUI_WIDTH, height=GUI_HEIGHT,  bg=COLOUR_CANVAS_BG, highlightthickness=0)
-        self.canvas.pack(side="left", padx=40, pady=20)  # Position the canvas on the left side
+        self.canvas = Canvas(root, bg=COLOUR_CANVAS_BG, highlightthickness=0)
+        self.canvas.pack(side="left", fill="both", expand=True, padx=0, pady=0)
+
 
         # Create a frame for the buttons on the right side
         button_frame =customtkinter.CTkFrame(root)
@@ -249,8 +252,8 @@ class ContourEditor:
             annotated_file_paths=os.listdir(FOLDER_ORIGINAL_IMAGES)
             annotated_image_names=[]
             for annotated_file_path in annotated_file_paths:
-
-                annotated_dataset_number=annotated_file_path.split("_")[-4]
+                print(annotated_file_path)
+                annotated_dataset_number=annotated_file_path.split("_")[-2]
                 annotated_image_counter=annotated_file_path.split("_")[-1].split(".p")[0]
 
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
