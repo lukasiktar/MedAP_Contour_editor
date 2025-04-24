@@ -166,7 +166,7 @@ class ContourEditor:
         os.makedirs(FOLDER_ORIGINAL_IMAGES, exist_ok=True)
         os.makedirs(FOLDER_MASKS, exist_ok=True)
         os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
-        os.makedir(FOLDER_PREANNOTATION, exist_ok=True)
+        os.makedirs(FOLDER_PREMASKS, exist_ok=True)
         os.makedirs(FOLDER_INFORMATION, exist_ok=True)
         
     # Function to display the current slider value
@@ -436,7 +436,7 @@ class ContourEditor:
     def on_click(self, event):
         if self.segmentation_performed:
             for i, (x,y) in enumerate(self.segment.contour_points):
-                if abs((x+self.x) - event.x) < 5 and abs((y+self.y) - event.y) < 5:
+                if abs((x+self.x) - event.x) < 15 and abs((y+self.y) - event.y) < 15:
                     self.selected_point=i
                     break
                 else:
@@ -454,12 +454,14 @@ class ContourEditor:
         """Zoom in by increasing the zoom factor."""
         self.zoom_value = min(self.zoom_value + self.zoom_factor, self.max_zoom)
         self.update_canvas()
+        self.perform_segmentation()
 
     #Zoom out method
     def zoom_out(self) -> None:
         """Zoom out by decreasing the zoom factor."""
         self.zoom_value = max(self.zoom_value - self.zoom_factor, self.min_zoom)
         self.update_canvas()
+        self.perform_segmentation()
 
     #Start drawing a polygon
     def start_polygon_drawing(self) -> None:
@@ -544,6 +546,16 @@ class ContourEditor:
                 self.empty_mask=self.segment.prediction
             else:
                 self.draw_contour()
+                #Save mask
+                x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
+
+                # Convert it back to the required format for OpenCV
+                res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+                self.smoothened_contours=[]
+                self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
+
+                self.preannotated_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+                self.preannotated_mask=cv2.drawContours(self.preannotated_mask,self.smoothened_contours,0,(255,255,255),-1)
 
     #Draw the contour on the loaded image
     def draw_contour(self):
@@ -692,6 +704,8 @@ class ContourEditor:
 
         info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
         self.save_image_info(info_path)
+        mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
+        cv2.imwrite(mask_save_path, self.preannotated_mask)
 
         if len(self.empty_mask)>1:
             if self.file_path.split(".")[-1]!="dcm":
