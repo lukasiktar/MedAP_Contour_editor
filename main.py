@@ -42,8 +42,7 @@ def update_stats_field(filepath, key, value):
     data[key] = value
     data['last_update'] = datetime.datetime.now().isoformat()
     save_stats(filepath, data)
-    
-    
+      
 def increment_segmented(filepath, count=1):
     stats = load_stats(filepath)
     stats['total_segmented'] += count
@@ -54,7 +53,7 @@ class ContourEditor:
     def __init__(self, root: customtkinter.CTk):
 
         #Segmentation model load
-        MODEL_PATH ="MUCSNet.pth"
+        MODEL_PATH ="epoch_19.pth"
         self.net = self.load_seg_model(MODEL_PATH)
         #Root setup
         self.root=root
@@ -217,8 +216,8 @@ class ContourEditor:
         
         Currently have the support for .jpeg, .jpg and .png images.
         """
-        # self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
-        self.directory_path = FOLDER_DATA
+        self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
+        #self.directory_path = FOLDER_DATA
         self.mask_directory_path=f"{self.directory_path}_mask"
         os.makedirs(self.mask_directory_path,exist_ok=True)
         if self.directory_path:
@@ -259,13 +258,14 @@ class ContourEditor:
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
 
 
-
+            print(self.file_path)
             self.file_name=str(self.file_path.split("/")[-1])
             self.dataset_number=str(self.file_path.split("_")[-3])
             self.image_counter=str(self.file_path.split("_")[-2])
             #Combined image name for sorting purposes
-            self.image_name=self.dataset_number+"_"+self.image_counter
-
+            #self.image_name=self.dataset_number+"_"+self.image_counter
+            self.image_name=str(self.file_name.split(".")[0])
+            print(self.image_name)
             if annotated_image_names:
                 if str(self.image_name) not in annotated_image_names:
                         #Define names for stored original (img) images and masks (gt)
@@ -709,7 +709,7 @@ class ContourEditor:
         if self.operational_image is None:
             return
 
-        info_path = f"{FOLDER_INFORMATION}/{self.mask_image_name}.txt"
+        info_path = f"{FOLDER_INFORMATION}/{self.image_name}.txt"
         self.save_image_info(info_path)
         mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
         cv2.imwrite(mask_save_path, self.preannotated_mask)
@@ -747,8 +747,18 @@ class ContourEditor:
                 self.smoothened_contours=[]
                 self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
+                 # Scale contours to original image size
+                self.scaled_contours = []
+                for contour in self.smoothened_contours:
+                    contour = contour.astype(np.float32)
+
+                    contour[:, 0, 0] /= self.zoom_value
+                    contour[:, 0, 1]  /= self.zoom_value
+
+                    self.scaled_contours.append(contour.astype(np.int32))
+
                 self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-                self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
+                self.mask=cv2.drawContours(self.mask,self.scaled_contours,0,(255,255,255),-1)
 
                 # Create file meta with original transfer syntax
                 file_meta = FileMetaDataset()
@@ -805,7 +815,7 @@ class ContourEditor:
 
                 # Save the annotated image
                 output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
-                self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.smoothened_contours,0,(255,255,255),2)
+                self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.scaled_contours,0,(255,255,255),2)
                 cv2.imwrite(output_image_path, self.annotated_image_real_size)
             else:
                 #Save mask

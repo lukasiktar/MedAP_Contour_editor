@@ -1,5 +1,8 @@
 #!/bin/bash
 
+sudo apt-get install python3-tk 
+sudo apt-get install curl
+
 DEST_DIR="./networks"
 mkdir -p "$DEST_DIR"
 
