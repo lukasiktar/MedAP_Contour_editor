@@ -700,6 +700,7 @@ class ContourEditor:
             self.previous_segment = None
             #If polygon exists:
             
+            self.segment = None
             #Stopped drawing polygons
             self.drawing_polygon = False
             #Set the environment ready for the first polygon
@@ -793,7 +794,6 @@ class ContourEditor:
 
         if len(self.empty_mask)>1:
             if self.file_path.split(".")[-1]!="dcm":
-                
                 #Save empty mask
                 mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
                 # print(mask_save_path)
@@ -924,21 +924,74 @@ class ContourEditor:
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
         else:
-            if self.file_path.split(".")[-1]!="dcm":
+            #if self.file_path.split(".")[-1]!="dcm":
                 
-                #Save mask
-                mask_save_path=f"{FOLDER_MASKS}/{self.mask_image_name}.png"
-                cv2.imwrite(mask_save_path, (self.polygon.resized_mask * 255).astype(np.uint8))
+            #Save mask
+            mask_image_name=self.mask_image_name.replace("_gt_slice_","_")
+            png_mask_save_path=f"{FOLDER_MASKS}/{mask_image_name.split("/")[-1]}.png"
+            mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}.dcm"
+            self.mask =(self.polygon.resized_mask * 255).astype(np.uint8)
+            cv2.imwrite(png_mask_save_path, self.mask)
 
-                # Save the annotated image
-                output_image_path=f"{FOLDER_ANNOTATIONS}/{self.original_image_name}.png"
-                self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path, self.image1)
+            # Create file meta with original transfer syntax
+            file_meta = FileMetaDataset()
+            file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
+            file_meta.MediaStorageSOPClassUID = self.dicom_image_data.SOPClassUID
+            file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+            file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
 
-                #Save original image
-                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{self.original_image_name}.png"
-                self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
-                cv2.imwrite(output_image_path_original, self.original_image_rgb)
+            # Create new dataset inheriting original metadata
+            ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
+
+
+            # Copy all original metadata except pixel-related tags
+            for elem in self.dicom_image_data:
+                if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
+                    ds.add(elem)
+            
+            # Set mask-specific attributes
+            ds.Rows, ds.Columns = self.preannotated_mask.shape
+            ds.SamplesPerPixel = 1
+            ds.PhotometricInterpretation = "MONOCHROME2"
+            ds.BitsStored = self.dicom_image_data.BitsStored
+            ds.BitsAllocated = self.dicom_image_data.BitsAllocated
+            ds.HighBit = self.dicom_image_data.HighBit
+            ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
+
+            # Set mask pixel data (ensure correct dtype)
+            ds.PixelData = self.preannotated_mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
+            
+            # Update required UIDs and timestamps
+            ds.SOPInstanceUID = pydicom.uid.generate_uid()
+            ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+            ds.InstanceCreationDate = datetime.datetime.now().strftime('%Y%m%d')
+            ds.InstanceCreationTime = datetime.datetime.now().strftime('%H%M%S')
+            
+            # Modify identification tags
+            ds.SeriesDescription = "Segmentation Mask"
+            #ds.SeriesNumber = str(int(self.dicom_image_data.SeriesNumber) + 1000) if hasattr(self.dicom_image_data, 'SeriesNumber') else "1000"
+            
+            # Set appropriate SOP Class (Secondary Capture)
+            ds.SOPClassUID = "1.2.840.10008.5.1.4.1.1.7"  # Secondary Capture Image Storage
+            
+            # Save the new DICOM file
+            ds.save_as(mask_save_path)
+
+            # Save the annotated image
+            original_image_name=self.original_image_name.replace("_img_slice_","_")
+            output_image_path=f"{FOLDER_ANNOTATIONS}/{original_image_name.split("/")[-1]}.png"
+            print(f"output image path: {output_image_path}")
+            self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(output_image_path, self.image1)
+
+            #Save original image
+            original_image_name=self.original_image_name.replace("_img_slice_","_")
+            
+            output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{original_image_name.split("/")[-1]}.png"
+            print(f"original image path: {output_image_path_original}")
+
+            self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
+            cv2.imwrite(output_image_path_original, self.original_image_rgb)
                 
             
         increment_segmented('stats.json', count=1)
