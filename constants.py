@@ -7,7 +7,7 @@ You can alter the values to change to look of the pdf.
 BUTTON_EXIT = 'q'
 
 # FOLDERS
-FOLDER_DATA = './data'
+FOLDER_DATA = 'data'
 FOLDER_ANNOTATED = 'AnnotatedDataset'
 FOLDER_MASKS = f'{FOLDER_ANNOTATED}/masks'
 FOLDER_PREMASKS = f'{FOLDER_ANNOTATED}/pre_annotations'

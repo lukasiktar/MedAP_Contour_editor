@@ -216,8 +216,8 @@ class ContourEditor:
         
         Currently have the support for .jpeg, .jpg and .png images.
         """
-        self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
-        #self.directory_path = FOLDER_DATA
+        #self.directory_path = customtkinter.filedialog.askdirectory(title="Select a directory containing images")
+        self.directory_path = FOLDER_DATA
         self.mask_directory_path=f"{self.directory_path}_mask"
         os.makedirs(self.mask_directory_path,exist_ok=True)
         if self.directory_path:
@@ -260,8 +260,8 @@ class ContourEditor:
 
             print(self.file_path)
             self.file_name=str(self.file_path.split("/")[-1])
-            self.dataset_number=str(self.file_path.split("_")[-3])
-            self.image_counter=str(self.file_path.split("_")[-2])
+            self.dataset_number=str(self.file_path.split("_")[-2])
+            self.image_counter=str(self.file_path.split("_")[-1].split('.d')[0])
             #Combined image name for sorting purposes
             #self.image_name=self.dataset_number+"_"+self.image_counter
             self.image_name=str(self.file_name.split(".")[0])
@@ -407,12 +407,13 @@ class ContourEditor:
         if self.prev_image_name == None:
             return
         try:
+            print(f'will remove {FOLDER_INFORMATION}/{self.prev_image_name}.txt')
+            os.remove(f'{FOLDER_INFORMATION}/{self.prev_image_name}.txt')
             os.remove(f'{FOLDER_ANNOTATIONS}/{self.prev_image_name}.png')
             os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
             prev_mask_name = self.prev_image_name.replace('img', 'gt')
-            os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
-            os.remove(f'{FOLDER_PREMASKS}/{prev_mask_name}.png')
-            os.remove(f'{FOLDER_INFORMATION}/{self.prev_image_name}.txt')
+            # os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+            # os.remove(f'{FOLDER_PREMASKS}/{prev_mask_name}.png')
         except:
             pass
 
@@ -720,7 +721,7 @@ class ContourEditor:
         if self.operational_image is None:
             return
 
-        info_path = f"{FOLDER_INFORMATION}/{self.original_image_name}.txt"
+        info_path = f"{FOLDER_INFORMATION}/{self.image_name}.txt"
         self.save_image_info(info_path)
         mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
         cv2.imwrite(mask_save_path, self.preannotated_mask)
@@ -891,7 +892,7 @@ class ContourEditor:
         self.previous_segment = None
 
         # store this as previous image
-        self.prev_image_name = self.original_image_name
+        self.prev_image_name = self.image_name
         
         # Move to the next image
         self.current_image_index += 1
