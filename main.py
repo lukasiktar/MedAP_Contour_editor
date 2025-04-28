@@ -406,12 +406,21 @@ class ContourEditor:
 
         if self.prev_image_name == None:
             return
-        
-        os.remove(f'{FOLDER_ANNOTATIONS}/{self.prev_image_name}.png')
-        os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
-        prev_mask_name = self.prev_image_name.replace('img', 'gt')
-        os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+        try:
+            os.remove(f'{FOLDER_ANNOTATIONS}/{self.prev_image_name}.png')
+            os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
+            prev_mask_name = self.prev_image_name.replace('img', 'gt')
+            os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+        except:
+            pass
 
+        try:
+            os.remove(f'{FOLDER_ANNOTATIONS}/{self.prev_image_name}.png')
+            os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
+            prev_mask_name = self.prev_image_name.replace('img', 'gt')
+            os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+        except:
+            pass
         self.prev_image_name = None
 
         self.current_image_index -= 1

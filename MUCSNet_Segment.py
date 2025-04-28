@@ -59,6 +59,10 @@ class MUCSNet_Segmentator:
                 #Create a binary mask from predicitons
                 a = 1.0*(self.pred>0.5)
                 self.prediction = a.astype(np.uint8)
+                non_black_mask = (self.zoomed_image > 5).astype(np.uint8)
+                non_black_mask = cv2.resize(non_black_mask, (self.prediction.shape[1], self.prediction.shape[0]))
+                self.prediction = cv2.bitwise_and(self.prediction, self.prediction, mask=non_black_mask)
+
                 self.prediction = cv2.normalize(self.prediction, dst=None, alpha=0, beta=255,norm_type=cv2.NORM_MINMAX, dtype=cv2.CV_8U)
                 self.prediction=cv2.resize(self.prediction, (self.zoomed_image.shape[1],self.zoomed_image.shape[0]))
                 
