@@ -220,6 +220,8 @@ class ContourEditor:
         self.directory_path = FOLDER_DATA
         self.mask_directory_path=f"{self.directory_path}_mask"
         os.makedirs(self.mask_directory_path,exist_ok=True)
+        self.preannotation_mask_directory_path=f"{self.directory_path}_premask"
+        os.makedirs(self.preannotation_mask_directory_path,exist_ok=True)
         if self.directory_path:
             # Filter for valid image files
             valid_extensions = {".jpeg", ".jpg", ".png", ".dcm"}
@@ -254,6 +256,8 @@ class ContourEditor:
                 print(annotated_file_path)
                 annotated_dataset_number=annotated_file_path.split("_")[-2]
                 annotated_image_counter=annotated_file_path.split("_")[-1].split(".p")[0]
+                print(f"annoatetated dataset {annotated_dataset_number}" )
+                print(f"annotated counter {annotated_image_counter}")
 
                 annotated_image_names.append(annotated_dataset_number+"_"+annotated_image_counter)
 
@@ -725,6 +729,57 @@ class ContourEditor:
         self.save_image_info(info_path)
         mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
         cv2.imwrite(mask_save_path, self.preannotated_mask)
+        image_name_dcm=self.mask_image_name.split("/")[-1]
+        image_name_dcm=image_name_dcm.replace("_gt_slice_","_")
+        preannotation_mask_directory_path=f"{self.preannotation_mask_directory_path}/{image_name_dcm}.dcm"
+
+        png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
+        cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
+        
+        # Create file meta with original transfer syntax
+        file_meta = FileMetaDataset()
+        file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
+        file_meta.MediaStorageSOPClassUID = self.dicom_image_data.SOPClassUID
+        file_meta.MediaStorageSOPInstanceUID = pydicom.uid.generate_uid()
+        file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
+
+        # Create new dataset inheriting original metadata
+        ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
+
+
+        # Copy all original metadata except pixel-related tags
+        for elem in self.dicom_image_data:
+            if elem.tag not in [0x7FE00010, 0x00280010, 0x00280011]:  # Skip PixelData, Rows, Columns
+                ds.add(elem)
+        
+        # Set mask-specific attributes
+        ds.Rows, ds.Columns = self.preannotated_mask.shape
+        ds.SamplesPerPixel = 1
+        ds.PhotometricInterpretation = "MONOCHROME2"
+        ds.BitsStored = self.dicom_image_data.BitsStored
+        ds.BitsAllocated = self.dicom_image_data.BitsAllocated
+        ds.HighBit = self.dicom_image_data.HighBit
+        ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
+
+        # Set mask pixel data (ensure correct dtype)
+        ds.PixelData = self.preannotated_mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
+        
+        # Update required UIDs and timestamps
+        ds.SOPInstanceUID = pydicom.uid.generate_uid()
+        ds.SeriesInstanceUID = pydicom.uid.generate_uid()
+        ds.InstanceCreationDate = datetime.datetime.now().strftime('%Y%m%d')
+        ds.InstanceCreationTime = datetime.datetime.now().strftime('%H%M%S')
+        
+        # Modify identification tags
+        ds.SeriesDescription = "Segmentation Mask"
+        #ds.SeriesNumber = str(int(self.dicom_image_data.SeriesNumber) + 1000) if hasattr(self.dicom_image_data, 'SeriesNumber') else "1000"
+        
+        # Set appropriate SOP Class (Secondary Capture)
+        ds.SOPClassUID = "1.2.840.10008.5.1.4.1.1.7"  # Secondary Capture Image Storage
+        
+        # Save the new DICOM file
+        ds.save_as(preannotation_mask_directory_path)
+
 
         if len(self.empty_mask)>1:
             if self.file_path.split(".")[-1]!="dcm":
@@ -750,7 +805,9 @@ class ContourEditor:
             if self.file_path.split(".")[-1]=="dcm":
                 #Save mask
                 image_name_dcm=self.mask_image_name.split("/")[-1]
-                mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}_{self.image_counter}.dcm"
+                image_name_dcm=image_name_dcm.replace("_gt_slice_","_")
+                mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}.dcm"
+                png_mask_save_path=f"{FOLDER_MASKS}/{image_name_dcm}.png"
                 # print(mask_save_path)
                 x_new, y_new = self.segment.contour_points[:, 0], self.segment.contour_points[:, 1]
 
@@ -771,6 +828,9 @@ class ContourEditor:
 
                 self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
                 self.mask=cv2.drawContours(self.mask,self.scaled_contours,0,(255,255,255),-1)
+
+                cv2.imwrite(png_mask_save_path, self.mask)
+
 
                 # Create file meta with original transfer syntax
                 file_meta = FileMetaDataset()
@@ -818,7 +878,7 @@ class ContourEditor:
 
                 #Save the original image
                 #Save original image
-                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{image_name_dcm}_{self.image_counter}.png"
+                output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{image_name_dcm}.png"
                 self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
                 cv2.imwrite(output_image_path_original, self.original_image_rgb)
 
@@ -826,7 +886,7 @@ class ContourEditor:
 
 
                 # Save the annotated image
-                output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}_{self.image_counter}.png"
+                output_image_path=f"{FOLDER_ANNOTATIONS}/{image_name_dcm}.png"
                 self.annotated_image_real_size=cv2.drawContours(self.operational_image,self.scaled_contours,0,(255,255,255),2)
                 cv2.imwrite(output_image_path, self.annotated_image_real_size)
             else:
