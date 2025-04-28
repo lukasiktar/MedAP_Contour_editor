@@ -6,5 +6,6 @@ networks/
 /AnnotatedDataset
 data*/
 _mask
+_premask
 stats.json
 ExactDataDicom_dr_annotations_KBC_1

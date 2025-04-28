@@ -576,8 +576,18 @@ class ContourEditor:
                 self.smoothened_contours=[]
                 self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
+                # Scale contours to original image size
+                self.scaled_contours = []
+                for contour in self.smoothened_contours:
+                    contour = contour.astype(np.float32)
+
+                    contour[:, 0, 0] /= self.zoom_value
+                    contour[:, 0, 1]  /= self.zoom_value
+
+                    self.scaled_contours.append(contour.astype(np.int32))
+
                 self.preannotated_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-                self.preannotated_mask=cv2.drawContours(self.preannotated_mask,self.smoothened_contours,0,(255,255,255),-1)
+                self.preannotated_mask=cv2.drawContours(self.preannotated_mask,self.scaled_contours,0,(255,255,255),-1)
 
     #Draw the contour on the loaded image
     def draw_contour(self):
@@ -727,8 +737,8 @@ class ContourEditor:
 
         info_path = f"{FOLDER_INFORMATION}/{self.image_name}.txt"
         self.save_image_info(info_path)
-        mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
-        cv2.imwrite(mask_save_path, self.preannotated_mask)
+        #mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
+        #cv2.imwrite(mask_save_path, self.preannotated_mask)
         image_name_dcm=self.mask_image_name.split("/")[-1]
         image_name_dcm=image_name_dcm.replace("_gt_slice_","_")
         preannotation_mask_directory_path=f"{self.preannotation_mask_directory_path}/{image_name_dcm}.dcm"
@@ -744,7 +754,7 @@ class ContourEditor:
         file_meta.ImplementationClassUID = self.dicom_image_data.file_meta.ImplementationClassUID
 
         # Create new dataset inheriting original metadata
-        ds = FileDataset(mask_save_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
+        ds = FileDataset(preannotation_mask_directory_path, {}, file_meta=file_meta, preamble=self.dicom_image_data.preamble)
 
 
         # Copy all original metadata except pixel-related tags
