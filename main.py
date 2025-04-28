@@ -411,6 +411,8 @@ class ContourEditor:
             os.remove(f'{FOLDER_ORIGINAL_IMAGES}/{self.prev_image_name}.png')
             prev_mask_name = self.prev_image_name.replace('img', 'gt')
             os.remove(f'{FOLDER_MASKS}/{prev_mask_name}.png')
+            os.remove(f'{FOLDER_PREMASKS}/{prev_mask_name}.png')
+            os.remove(f'{FOLDER_INFORMATION}/{self.prev_image_name}.txt')
         except:
             pass
 
@@ -718,7 +720,7 @@ class ContourEditor:
         if self.operational_image is None:
             return
 
-        info_path = f"{FOLDER_INFORMATION}/{self.image_name}.txt"
+        info_path = f"{FOLDER_INFORMATION}/{self.original_image_name}.txt"
         self.save_image_info(info_path)
         mask_save_path=f"{FOLDER_PREMASKS}/{self.mask_image_name}.png"
         cv2.imwrite(mask_save_path, self.preannotated_mask)
