@@ -928,7 +928,8 @@ class ContourEditor:
                 
             #Save mask
             mask_image_name=self.mask_image_name.replace("_gt_slice_","_")
-            png_mask_save_path=f"{FOLDER_MASKS}/{mask_image_name.split("/")[-1]}.png"
+            mask_image_name=mask_image_name.split("/")[-1]
+            png_mask_save_path=f"{FOLDER_MASKS}/{mask_image_name}.png"
             mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}.dcm"
             self.mask =(self.polygon.resized_mask * 255).astype(np.uint8)
             cv2.imwrite(png_mask_save_path, self.mask)
@@ -979,15 +980,16 @@ class ContourEditor:
 
             # Save the annotated image
             original_image_name=self.original_image_name.replace("_img_slice_","_")
-            output_image_path=f"{FOLDER_ANNOTATIONS}/{original_image_name.split("/")[-1]}.png"
+            original_image_name=original_image_name.split("/")[-1]
+            output_image_path=f"{FOLDER_ANNOTATIONS}/{original_image_name}.png"
             print(f"output image path: {output_image_path}")
             self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
             cv2.imwrite(output_image_path, self.image1)
 
             #Save original image
             original_image_name=self.original_image_name.replace("_img_slice_","_")
-            
-            output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{original_image_name.split("/")[-1]}.png"
+            original_image_name=original_image_name.split("/")[-1]
+            output_image_path_original=f"{FOLDER_ORIGINAL_IMAGES}/{original_image_name}.png"
             print(f"original image path: {output_image_path_original}")
 
             self.original_image_rgb = cv2.cvtColor(self.original_image, cv2.COLOR_BGR2RGB)
