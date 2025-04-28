@@ -4,7 +4,7 @@
 networks/
 *.pth
 /AnnotatedDataset
-data/
+data*/
 _mask
 stats.json
 ExactDataDicom_dr_annotations_KBC_1
