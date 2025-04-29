@@ -954,7 +954,7 @@ class ContourEditor:
                     ds.add(elem)
             
             # Set mask-specific attributes
-            ds.Rows, ds.Columns = self.preannotated_mask.shape
+            ds.Rows, ds.Columns = self.mask.shape
             ds.SamplesPerPixel = 1
             ds.PhotometricInterpretation = "MONOCHROME2"
             ds.BitsStored = self.dicom_image_data.BitsStored
@@ -963,7 +963,7 @@ class ContourEditor:
             ds.PixelRepresentation = self.dicom_image_data.PixelRepresentation
 
             # Set mask pixel data (ensure correct dtype)
-            ds.PixelData = self.preannotated_mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
+            ds.PixelData = self.mask.astype(self.dicom_image_data.pixel_array.dtype).tobytes()
             
             # Update required UIDs and timestamps
             ds.SOPInstanceUID = pydicom.uid.generate_uid()
