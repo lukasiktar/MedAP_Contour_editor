@@ -105,10 +105,10 @@ class ContourEditor:
 
         #Buttons
         self.load_button = customtkinter.CTkButton(button_frame,text="Load Dataset", font=(self.font_size,self.font_size), command=self.load_images)          
-        self.save_button = customtkinter.CTkButton(button_frame, text="Save Annotation", font=(self.font_size,self.font_size), fg_color='green', hover_color="dark green", command=self.save_image)
-        self.reset_button = customtkinter.CTkButton(button_frame, text="Reset Annotation", font=(self.font_size,self.font_size), command=self.reset_rectangle)
+        self.save_button = customtkinter.CTkButton(button_frame, text="Save Annotation (Enter)", font=(self.font_size,self.font_size), fg_color='green', hover_color="dark green", command=self.save_image)
+        self.reset_button = customtkinter.CTkButton(button_frame, text="Reset Annotation (R)", font=(self.font_size,self.font_size), command=self.reset_rectangle)
         self.draw_polygon_button = customtkinter.CTkButton(button_frame, text="Draw Polygon", font=(self.font_size,self.font_size), command=self.start_polygon_drawing)
-        self.perform_segmentation_button = customtkinter.CTkButton(button_frame, text="Perform segmentation", font=(self.font_size,self.font_size), command=self.perform_segmentation)
+        self.perform_segmentation_button = customtkinter.CTkButton(button_frame, text="Perform segmentation (P)", font=(self.font_size,self.font_size), command=self.perform_segmentation)
         self.draw_empty_segmetation_button=customtkinter.CTkButton(button_frame, text="Empty Segmentation", font=(self.font_size,self.font_size), command=self.perform_empty_mask_segmentation)
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
@@ -463,13 +463,25 @@ class ContourEditor:
                     break
                 else:
                     self.selected_point=None
+        else:
+            for i, (x,y) in enumerate(self.polygon_points):
+                if abs((x+self.x) - event.x) < 15 and abs((y+self.y) - event.y) < 15:
+                    self.selected_point=i
+                    break
+                else:
+                    self.selected_point=None
 
     #Action performed while dragging
     def on_drag(self, event):
         if hasattr(self, "selected_point"):
-            if self.selected_point is not None:
-                self.segment.contour_points[self.selected_point]=[event.x-self.x, event.y-self.y]
-                self.draw_contour()
+            if self.segmentation_performed:
+                if self.selected_point is not None:
+                    self.segment.contour_points[self.selected_point]=[event.x-self.x, event.y-self.y]
+                    self.draw_contour()
+            else:
+                if self.selected_point is not None:
+                    self.polygon_points[self.selected_point]=[event.x-self.x, event.y-self.y]
+                    self.draw_contour()
             
     #Zoom in method
     def zoom_in(self) -> None:
@@ -492,11 +504,11 @@ class ContourEditor:
         self.polygon_points.clear()
         self.segment = None
         if self.ready_for_first_polygon:
-            messagebox.showinfo("Polygon mode", "Click on the canvas to add vertices. Double-click to complete.")
+            messagebox.showinfo("Polygon mode", "Click on the canvas to add vertices. Right click mouse to complete.")
             #self.file_name=simpledialog.askstring("Polygon Mode", "Click on the canvas to add vertices. Double-click to complete. \n Enter the filename (without extension):")
             self.ready_for_first_polygon=False
             self.canvas.bind("<Button-1>", self.on_mouse_down)
-            self.canvas.bind("<Double-1>", self.on_double_click) 
+            self.canvas.bind("<Button-3>", self.on_double_click) 
       
       
 
@@ -510,6 +522,7 @@ class ContourEditor:
     #Compplete the polygon on double click
     def on_double_click(self, event) -> None:
         """Complete the polygon when double-clicked."""
+        # TODO change name of function, called when right click is pressed
         self.number_of_polygons=1
         if self.drawing_polygon:
             self.complete_polygon()
@@ -532,8 +545,10 @@ class ContourEditor:
         messagebox.showinfo("Polygon", "Polygon created successfully.")
 
         self.drawing_polygon = False
-        cv2.polylines(self.operational_image, [np.array(self.polygon_points)], isClosed=True, color=(255, 255, 255), thickness=2)
+        self.segmentation_performed=False
+        #cv2.polylines(self.operational_image, [np.array(self.polygon_points)], isClosed=True, color=(255, 255, 255), thickness=2)
         self.update_canvas()
+        self.draw_contour_polygon()
 
                 
                 
@@ -613,8 +628,89 @@ class ContourEditor:
         # Display the image at central coordinates
         self.canvas.create_image(self.x, self.y, anchor="nw", image=self.tk_image)
 
-        if self.segment.contour_points is not None:
-            for i, (x, y) in enumerate(self.segment.contour_points):
+        if self.segmentation_performed:
+            if self.segment.contour_points is not None:
+                for i, (x, y) in enumerate(self.segment.contour_points):
+                    # Scale the contour points based on the zoom factor
+                    x = int(x )
+                    y = int(y )
+                    # Offset the points to align with the centered image
+                    x += self.x
+                    y += self.y
+
+                    # Draw lines between consecutive points
+                    line_width=3
+                    prev_x = int(self.segment.contour_points[i - 1][0] ) + self.x
+                    prev_y = int(self.segment.contour_points[i - 1][1] ) + self.y
+                    self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
+                    
+
+
+            if self.segment.contour_points is not None:
+                for i, (x, y) in enumerate(self.segment.contour_points):
+                    # Scale the contour points based on the zoom factor
+                    x = int(x )
+                    y = int(y )
+                    
+                    # Offset the points to align with the centered image
+                    x += self.x
+                    y += self.y
+                    # Draw points
+                    cirlce_radius=4
+                    self.canvas.create_oval(x - cirlce_radius, y - cirlce_radius, x + cirlce_radius, y + cirlce_radius, fill="blue", tags=f"point_{i}")
+        else:
+            if self.polygon_points is not None:
+                for i, (x, y) in enumerate(self.polygon_points):
+                    # Scale the contour points based on the zoom factor
+                    x = int(x )
+                    y = int(y )
+                    # Offset the points to align with the centered image
+                    x += self.x
+                    y += self.y
+
+                    # Draw lines between consecutive points
+                    line_width=3
+                    prev_x = int(self.polygon_points[i - 1][0] ) + self.x
+                    prev_y = int(self.polygon_points[i - 1][1] ) + self.y
+                    self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
+                    
+
+
+            if self.polygon_points is not None:
+                for i, (x, y) in enumerate(self.polygon_points):
+                    # Scale the contour points based on the zoom factor
+                    x = int(x )
+                    y = int(y )
+                    
+                    # Offset the points to align with the centered image
+                    x += self.x
+                    y += self.y
+                    # Draw points
+                    cirlce_radius=4
+                    self.canvas.create_oval(x - cirlce_radius, y - cirlce_radius, x + cirlce_radius, y + cirlce_radius, fill="blue", tags=f"point_{i}")
+
+    #Display image with contours for polygon draw
+    def draw_contour_polygon(self):
+        self.canvas.delete("all")
+        # Resize the image based on the zoom factor
+        self.zoomed_width = int(self.operational_image.shape[1] * self.zoom_value)
+        self.zoomed_height = int(self.operational_image.shape[0] * self.zoom_value)
+        self.zoomed_image = cv2.resize(self.operational_image, (self.zoomed_width, self.zoomed_height))
+
+        # Display image
+        self.tk_image = ImageTk.PhotoImage(image=Image.fromarray(self.zoomed_image))
+        
+        # Calculate coordinates to center the image
+        canvas_width = self.canvas.winfo_width()
+        canvas_height = self.canvas.winfo_height()
+        self.x = (canvas_width - self.zoomed_width) // 2
+        self.y = (canvas_height - self.zoomed_height) // 2
+        
+        # Display the image at central coordinates
+        self.canvas.create_image(self.x, self.y, anchor="nw", image=self.tk_image)
+
+        if self.polygon_points is not None:
+            for i, (x, y) in enumerate(self.polygon_points):
                 # Scale the contour points based on the zoom factor
                 x = int(x )
                 y = int(y )
@@ -623,15 +719,15 @@ class ContourEditor:
                 y += self.y
 
                 # Draw lines between consecutive points
-                line_width=6
-                prev_x = int(self.segment.contour_points[i - 1][0] ) + self.x
-                prev_y = int(self.segment.contour_points[i - 1][1] ) + self.y
+                line_width=3
+                prev_x = int(self.polygon_points[i - 1][0] ) + self.x
+                prev_y = int(self.polygon_points[i - 1][1] ) + self.y
                 self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
                 
 
 
-        if self.segment.contour_points is not None:
-            for i, (x, y) in enumerate(self.segment.contour_points):
+        if self.polygon_points is not None:
+            for i, (x, y) in enumerate(self.polygon_points):
                 # Scale the contour points based on the zoom factor
                 x = int(x )
                 y = int(y )
@@ -640,8 +736,9 @@ class ContourEditor:
                 x += self.x
                 y += self.y
                 # Draw points
-                cirlce_radius=8
+                cirlce_radius=4
                 self.canvas.create_oval(x - cirlce_radius, y - cirlce_radius, x + cirlce_radius, y + cirlce_radius, fill="blue", tags=f"point_{i}")
+                
                 
     #Update the canvas method
     def update_canvas(self, crosshair=None)-> None :
@@ -1034,7 +1131,28 @@ class ContourEditor:
             mask_image_name=mask_image_name.split("/")[-1]
             png_mask_save_path=f"{FOLDER_MASKS}/{mask_image_name}.png"
             mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}.dcm"
-            self.mask =(self.polygon.resized_mask * 255).astype(np.uint8)
+            polygon_array = np.array(self.polygon_points)
+
+            x_new, y_new = polygon_array[:, 0], polygon_array[:, 1]
+
+            # Convert it back to the required format for OpenCV
+            res_array = [[[int(i[0]), int(i[1])]] for i in zip(x_new, y_new)]
+            self.smoothened_contours=[]
+            self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
+
+                # Scale contours to original image size
+            self.scaled_contours = []
+            for contour in self.smoothened_contours:
+                contour = contour.astype(np.float32)
+
+                contour[:, 0, 0] /= self.zoom_value
+                contour[:, 0, 1]  /= self.zoom_value
+
+                self.scaled_contours.append(contour.astype(np.int32))
+
+            self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+            self.mask=cv2.drawContours(self.mask,self.scaled_contours,0,(255,255,255),-1)
+
             cv2.imwrite(png_mask_save_path, self.mask)
 
             # Create file meta with original transfer syntax
@@ -1087,6 +1205,7 @@ class ContourEditor:
             output_image_path=f"{FOLDER_ANNOTATIONS}/{original_image_name}.png"
             print(f"output image path: {output_image_path}")
             self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
+            self.image1=cv2.drawContours(self.image1,self.scaled_contours,0,(255,255,255),2)
             cv2.imwrite(output_image_path, self.image1)
 
             #Save original image
