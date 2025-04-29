@@ -454,7 +454,7 @@ class ContourEditor:
         # Reset GUI window title or provide feedback
         self.root.title("No Images Loaded")
 
-    #Action pefromed after click
+    #Action peformed after click
     def on_click(self, event):
         if self.segmentation_performed:
             for i, (x,y) in enumerate(self.segment.contour_points):
@@ -526,6 +526,9 @@ class ContourEditor:
         if len(self.polygon_points) < 3:
             messagebox.showwarning("Polygon Error", "At least 3 points are needed to complete a polygon.")
             return
+        self.canvas.unbind("<Button-1>")
+        self.canvas.unbind("<Double-1>")
+        self.canvas.bind("<Button-1>", self.on_click)
         messagebox.showinfo("Polygon", "Polygon created successfully.")
 
         self.drawing_polygon = False
@@ -1008,6 +1011,7 @@ class ContourEditor:
         # Reset the operational image to the original
         self.operational_image=None
         self.original_image=None
+        
 
         #Reset all the masks
         self.previous_mask=np.array([])
@@ -1018,6 +1022,10 @@ class ContourEditor:
 
         # store this as previous image
         self.prev_image_name = self.image_name
+
+        self.polygon_points.clear()
+        self.selected_point=None
+        self.segmentation_performed=False
         
         # Move to the next image
         self.current_image_index += 1
