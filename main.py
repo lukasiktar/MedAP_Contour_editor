@@ -729,8 +729,8 @@ class ContourEditor:
         if self.polygon_points is not None:
             for i, (x, y) in enumerate(self.polygon_points):
                 # Scale the contour points based on the zoom factor
-                x = int(x )
-                y = int(y )
+                x = int(x )*self.zoom_value
+                y = int(y )*self.zoom_value
                 
                 # Offset the points to align with the centered image
                 x += self.x
@@ -1140,18 +1140,18 @@ class ContourEditor:
             self.smoothened_contours=[]
             self.smoothened_contours.append(np.asarray(res_array, dtype=np.int32))
 
-                # Scale contours to original image size
-            self.scaled_contours = []
-            for contour in self.smoothened_contours:
-                contour = contour.astype(np.float32)
+            #     # Scale contours to original image size
+            # self.scaled_contours = []
+            # for contour in self.smoothened_contours:
+            #     contour = contour.astype(np.float32)
 
-                contour[:, 0, 0] /= self.zoom_value
-                contour[:, 0, 1]  /= self.zoom_value
+            #     contour[:, 0, 0] /= 1
+            #     contour[:, 0, 1]  /= 1
 
-                self.scaled_contours.append(contour.astype(np.int32))
+            #     self.scaled_contours.append(contour.astype(np.int32))
 
-            self.mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-            self.mask=cv2.drawContours(self.mask,self.scaled_contours,0,(255,255,255),-1)
+            self.mask=np.zeros((self.original_image.shape[0], self.original_image.shape[1]), dtype=np.uint8)
+            self.mask=cv2.drawContours(self.mask,self.smoothened_contours,0,(255,255,255),-1)
 
             cv2.imwrite(png_mask_save_path, self.mask)
 
