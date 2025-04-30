@@ -712,16 +712,16 @@ class ContourEditor:
         if self.polygon_points is not None:
             for i, (x, y) in enumerate(self.polygon_points):
                 # Scale the contour points based on the zoom factor
-                x = int(x )
-                y = int(y )
+                x = int(x )*self.zoom_value
+                y = int(y )*self.zoom_value
                 # Offset the points to align with the centered image
                 x += self.x
                 y += self.y
 
                 # Draw lines between consecutive points
                 line_width=3
-                prev_x = int(self.polygon_points[i - 1][0] ) + self.x
-                prev_y = int(self.polygon_points[i - 1][1] ) + self.y
+                prev_x = int(self.polygon_points[i - 1][0] )*self.zoom_value + self.x
+                prev_y = int(self.polygon_points[i - 1][1] )*self.zoom_value + self.y
                 self.canvas.create_line(prev_x, prev_y, x, y, width=line_width, fill="red")
                 
 
