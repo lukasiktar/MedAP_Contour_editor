@@ -662,8 +662,8 @@ class ContourEditor:
             if self.polygon_points is not None:
                 for i, (x, y) in enumerate(self.polygon_points):
                     # Scale the contour points based on the zoom factor
-                    x = int(x )
-                    y = int(y )
+                    x = int(x )*self.zoom_value
+                    y = int(y )*self.zoom_value
                     # Offset the points to align with the centered image
                     x += self.x
                     y += self.y
@@ -679,8 +679,8 @@ class ContourEditor:
             if self.polygon_points is not None:
                 for i, (x, y) in enumerate(self.polygon_points):
                     # Scale the contour points based on the zoom factor
-                    x = int(x )
-                    y = int(y )
+                    x = int(x )*self.zoom_value
+                    y = int(y )*self.zoom_value
                     
                     # Offset the points to align with the centered image
                     x += self.x
