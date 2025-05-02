@@ -456,6 +456,7 @@ class ContourEditor:
 
     #Action peformed after click
     def on_click(self, event):
+        print(f"x,y : {event.x}, {event.y}")
         if self.segmentation_performed:
             for i, (x,y) in enumerate(self.segment.contour_points):
                 if abs((x+self.x) - event.x) < 15 and abs((y+self.y) - event.y) < 15:
@@ -464,7 +465,8 @@ class ContourEditor:
                 else:
                     self.selected_point=None
         else:
-            for i, (x,y) in enumerate(self.polygon_points):
+            for i, (x,y) in enumerate(self.scaled_polygon_points):
+               
                 if abs((x+self.x) - event.x) < 15 and abs((y+self.y) - event.y) < 15:
                     self.selected_point=i
                     break
@@ -480,8 +482,8 @@ class ContourEditor:
                     self.draw_contour()
             else:
                 if self.selected_point is not None:
-                    self.polygon_points[self.selected_point]=[event.x-self.x, event.y-self.y]
-                    self.draw_contour()
+                    self.polygon_points[self.selected_point]=[(event.x-self.x)/self.zoom_value, (event.y-self.y)/self.zoom_value]
+                    self.draw_contour_polygon()
             
     #Zoom in method
     def zoom_in(self) -> None:
@@ -709,11 +711,13 @@ class ContourEditor:
         # Display the image at central coordinates
         self.canvas.create_image(self.x, self.y, anchor="nw", image=self.tk_image)
 
+        self.scaled_polygon_points=[]
         if self.polygon_points is not None:
             for i, (x, y) in enumerate(self.polygon_points):
                 # Scale the contour points based on the zoom factor
                 x = int(x )*self.zoom_value
                 y = int(y )*self.zoom_value
+                self.scaled_polygon_points.append((x,y))
                 # Offset the points to align with the centered image
                 x += self.x
                 y += self.y
@@ -1131,6 +1135,7 @@ class ContourEditor:
             mask_image_name=mask_image_name.split("/")[-1]
             png_mask_save_path=f"{FOLDER_MASKS}/{mask_image_name}.png"
             mask_save_path=f"{self.mask_directory_path}/{image_name_dcm}.dcm"
+
             polygon_array = np.array(self.polygon_points)
 
             x_new, y_new = polygon_array[:, 0], polygon_array[:, 1]
@@ -1205,7 +1210,7 @@ class ContourEditor:
             output_image_path=f"{FOLDER_ANNOTATIONS}/{original_image_name}.png"
             print(f"output image path: {output_image_path}")
             self.image1= cv2.cvtColor(self.operational_image, cv2.COLOR_BGR2RGB)
-            self.image1=cv2.drawContours(self.image1,self.scaled_contours,0,(255,255,255),2)
+            self.image1=cv2.drawContours(self.image1,self.smoothened_contours,0,(255,255,255),2)
             cv2.imwrite(output_image_path, self.image1)
 
             #Save original image
