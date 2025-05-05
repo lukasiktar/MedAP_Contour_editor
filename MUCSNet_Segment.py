@@ -44,7 +44,7 @@ class MUCSNet_Segmentator:
                 cls_pred = torch.sigmoid(cls_output).squeeze()
                 print(f"Confidence: {cls_pred}")
                 #Check if the classification predicts an object 
-                if cls_pred.item() < 0.9:  
+                if cls_pred.item() < 0.3:  
                     # If no object is predicted, create a black mask
                     self.pred = np.zeros((self.zoomed_image.shape[0], self.zoomed_image.shape[1]), dtype=np.uint8)
                     self.contour_points=None
