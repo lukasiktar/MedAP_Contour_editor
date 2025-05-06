@@ -855,7 +855,8 @@ class ContourEditor:
         png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
         if self.preannotated_mask==None:
             self.preannotated_mask=self.mask.copy()
-            cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
+        cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
+
         
         # Create file meta with original transfer syntax
         file_meta = FileMetaDataset()
