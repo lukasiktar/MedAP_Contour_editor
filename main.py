@@ -854,7 +854,8 @@ class ContourEditor:
 
         png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
         if self.preannotated_mask is None:
-            self.preannotated_mask=self.mask.copy()
+            height, width = self.original_image.shape[:2]
+            self.preannotated_mask = np.zeros((height, width), dtype=np.uint8)
         cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
 
         
