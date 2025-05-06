@@ -1,4 +1,5 @@
 import os
+import sys
 import json
 import cv2
 import torch
@@ -18,6 +19,8 @@ from networks.vit_seg_modeling import VisionTransformer as ViT_seg
 from networks.vit_seg_modeling import CONFIGS as CONFIGS_ViT_seg
 from MUCSNet_Segment import MUCSNet_Segmentator
 from Polygon_segmentator import Polygon_Segmentator
+
+sys.setrecursionlimit(10000) 
 
 def annotator_menu_callback(choice):
     print(f'new annotator: {choice}')
@@ -68,6 +71,7 @@ class ContourEditor:
         self.operational_image=None #Operational image
         self.original_image=None    #Original image
         self.tk_image=None          #Image format for canvas
+        self.preannotated_mask=None
 
         self.segmentation_performed=False   #Segmentaiton flag
         self.points_for_segmentation=50
@@ -849,7 +853,9 @@ class ContourEditor:
         preannotation_mask_directory_path=f"{self.preannotation_mask_directory_path}/{image_name_dcm}.dcm"
 
         png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
-        cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
+        if self.preannotated_mask==None:
+            self.preannotated_mask=self.mask.copy()
+            cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
         
         # Create file meta with original transfer syntax
         file_meta = FileMetaDataset()
