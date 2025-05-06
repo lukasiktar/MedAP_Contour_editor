@@ -573,6 +573,7 @@ class ContourEditor:
     def perform_empty_mask_segmentation(self)->None:
         if self.operational_image is not None:
             self.empty_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+            self.preannotated_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
     
     #Method that performs image segmentation
     def perform_segmentation(self)-> None :
@@ -853,12 +854,13 @@ class ContourEditor:
         preannotation_mask_directory_path=f"{self.preannotation_mask_directory_path}/{image_name_dcm}.dcm"
 
         png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
-        if self.preannotated_mask is None:
+        if self.preannotated_mask is None or not isinstance(self.preannotated_mask, np.ndarray):
+            # Create an empty mask with the same shape as the original image
             height, width = self.original_image.shape[:2]
             self.preannotated_mask = np.zeros((height, width), dtype=np.uint8)
-        cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
 
-        
+        cv2.imwrite(png_preannotation_mask_directory_path, self.preannotated_mask)
+                
         # Create file meta with original transfer syntax
         file_meta = FileMetaDataset()
         file_meta.TransferSyntaxUID = self.dicom_image_data.file_meta.TransferSyntaxUID
