@@ -71,7 +71,7 @@ class ContourEditor:
         self.operational_image=None #Operational image
         self.original_image=None    #Original image
         self.tk_image=None          #Image format for canvas
-        self.preannotated_mask=None
+        self.preannotated_mask=[]
 
         self.segmentation_performed=False   #Segmentaiton flag
         self.points_for_segmentation=50
@@ -853,7 +853,7 @@ class ContourEditor:
         preannotation_mask_directory_path=f"{self.preannotation_mask_directory_path}/{image_name_dcm}.dcm"
 
         png_preannotation_mask_directory_path=f"{FOLDER_PREMASKS}/{image_name_dcm}.png"
-        if self.preannotated_mask==None:
+        if self.preannotated_mask is None:
             self.preannotated_mask=self.mask.copy()
         cv2.imwrite(png_preannotation_mask_directory_path,self.preannotated_mask)
 
@@ -1242,6 +1242,7 @@ class ContourEditor:
         # Reset the operational image to the original
         self.operational_image=None
         self.original_image=None
+        self.preannotated_mask=None
         
 
         #Reset all the masks
