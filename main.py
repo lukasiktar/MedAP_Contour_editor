@@ -572,8 +572,8 @@ class ContourEditor:
     #Empty segmentation for case the input image does not show object
     def perform_empty_mask_segmentation(self)->None:
         if self.operational_image is not None:
-            self.empty_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-            self.preannotated_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+            self.empty_mask=np.zeros((self.original_image.shape[0], self.original_image.shape[1]), dtype=np.uint8)
+            self.preannotated_mask=np.zeros((self.original_image.shape[0], self.original_image.shape[1]), dtype=np.uint8)
     
     #Method that performs image segmentation
     def perform_segmentation(self)-> None :
