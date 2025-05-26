@@ -506,6 +506,7 @@ class ContourEditor:
     #Start drawing a polygon
     def start_polygon_drawing(self) -> None:
         """Start polygon drawing mode."""
+        #self.reset_rectangle()
         self.drawing_polygon = True
         self.polygon_points.clear()
         self.segment = None
