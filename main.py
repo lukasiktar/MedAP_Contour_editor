@@ -156,6 +156,7 @@ class ContourEditor:
         # shortcuts
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_release)
         self.root.bind("s", lambda event: self.save_image())
         self.root.bind("<Return>", lambda event: self.save_image())
         self.root.bind("r", lambda event: self.reset_rectangle())
@@ -488,6 +489,9 @@ class ContourEditor:
                 if self.selected_point is not None:
                     self.polygon_points[self.selected_point]=[(event.x-self.x)/self.zoom_value, (event.y-self.y)/self.zoom_value]
                     self.draw_contour_polygon()
+
+    def on_release(self, event):
+        self.selected_point = None
             
     #Zoom in method
     def zoom_in(self) -> None:
