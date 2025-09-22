@@ -162,6 +162,7 @@ class ContourEditor:
         # shortcuts
         self.canvas.bind("<Button-1>", self.on_click)
         self.canvas.bind("<B1-Motion>", self.on_drag)
+        self.canvas.bind("<ButtonRelease-1>", self.on_release)
         self.root.bind("s", lambda event: self.save_image())
         self.root.bind("<Return>", lambda event: self.save_image())
         self.root.bind("r", lambda event: self.reset_rectangle())
@@ -489,6 +490,9 @@ class ContourEditor:
                 if self.selected_point is not None:
                     self.polygon_points[self.selected_point]=[(event.x-self.x)/self.zoom_value, (event.y-self.y)/self.zoom_value]
                     self.draw_contour_polygon()
+
+    def on_release(self, event):
+        self.selected_point = None
             
     #Zoom in method
     def zoom_in(self) -> None:
@@ -507,6 +511,7 @@ class ContourEditor:
     #Start drawing a polygon
     def start_polygon_drawing(self) -> None:
         """Start polygon drawing mode."""
+        self.reset_rectangle()
         self.drawing_polygon = True
         self.polygon_points.clear()
         self.segment = None
@@ -573,8 +578,8 @@ class ContourEditor:
     #Empty segmentation for case the input image does not show object
     def perform_empty_mask_segmentation(self)->None:
         if self.operational_image is not None:
-            self.empty_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
-            self.preannotated_mask=np.zeros((self.operational_image.shape[0], self.operational_image.shape[1]), dtype=np.uint8)
+            self.empty_mask=np.zeros((self.original_image.shape[0], self.original_image.shape[1]), dtype=np.uint8)
+            self.preannotated_mask=np.zeros((self.original_image.shape[0], self.original_image.shape[1]), dtype=np.uint8)
     
     #Method that performs image segmentation
     def perform_segmentation(self)-> None :

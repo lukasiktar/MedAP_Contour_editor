@@ -19,6 +19,7 @@ class MUCSNet_Segmentator:
         self.image_shape=image_shape
         self.net=net
         self.points_for_segmentation=points_for_segmentation
+        self.contour_points=None
         
         patch_size=[224, 224]
         x, y = patch_size[0], patch_size[1]
