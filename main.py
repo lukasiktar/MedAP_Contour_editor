@@ -30,7 +30,7 @@ def load_stats(filepath):
         with open(filepath, 'r') as f:
             return json.load(f)
     except FileNotFoundError:
-        return {"total_segmented": 0, "last_update": None, "total_sessions": 0}
+        return {"total_segmented": 0, "last_update": None, "total_sessions": 0, "previous_annotator": None}
 
 def get_total_segmented(filepath):
     stats = load_stats(filepath)
@@ -102,6 +102,10 @@ class ContourEditor:
         self.canvas = Canvas(root, bg=COLOUR_CANVAS_BG, highlightthickness=0)
         self.canvas.pack(side="left", fill="both", expand=True, padx=0, pady=0)
 
+        # keep track of total number of session
+        stats = load_stats(STATS_FILENAME)
+        total_sessions = stats['total_sessions']
+        update_stats_field(STATS_FILENAME, 'total_sessions', total_sessions+1)
 
         # Create a frame for the buttons on the right side
         button_frame =customtkinter.CTkFrame(root)
@@ -117,7 +121,8 @@ class ContourEditor:
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
-        self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
+        # self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
+        self.annotator = customtkinter.CTkEntry(button_frame, height=40, placeholder_text=stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
         self.interesting_checkbox_value = False
         self.interesting_checkbox = customtkinter.CTkCheckBox(button_frame, text='Interesting')
 
@@ -131,7 +136,8 @@ class ContourEditor:
         self.exit_button.grid(row=6, column=0, ipadx=12, ipady=12, padx=20, pady=30, sticky="ew")
         self.undo_button.grid(row=8, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
-        self.annotator_dropdown.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        # self.annotator_dropdown.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
+        self.annotator.grid(row=9, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
         self.interesting_checkbox.grid(row=10, column=0, ipadx=0, ipady=12, padx=20, pady=30, sticky="ew")
 
         # Create a frame for other controls
@@ -172,11 +178,6 @@ class ContourEditor:
         os.makedirs(FOLDER_ANNOTATIONS, exist_ok=True)
         os.makedirs(FOLDER_PREMASKS, exist_ok=True)
         os.makedirs(FOLDER_INFORMATION, exist_ok=True)
-
-        # keep track of total number of session
-        stats = load_stats(STATS_FILENAME)
-        total_sessions = stats['total_sessions']
-        update_stats_field(STATS_FILENAME, 'total_sessions', total_sessions+1)
         
     # Function to display the current slider value
     def update_label(self, value):
@@ -282,7 +283,7 @@ class ContourEditor:
                         #self.annotated_image_conunter+=1
                         #Set the canvas title
                         # self.root.title(self.original_image_name)
-                        self.root.title(f'Image {get_total_segmented(STATS_FILENAME)+1}/TODO')
+                        self.root.title(f'Image {get_total_segmented(STATS_FILENAME)+1}/1200')
                       
                         if self.file_path:
                             path=self.file_path.split(".")[-1]
@@ -829,7 +830,8 @@ class ContourEditor:
         '''
         is_interesting = 'yes' if self.interesting_checkbox.get() else 'no'
         data = {
-            "annotator": self.annotator_dropdown._current_value,
+            # "annotator": self.annotator_dropdown._current_value,
+            "annotator": self.annotator.get(),
             "is_interesting": is_interesting,
             "time": datetime.datetime.now().isoformat()
         }
@@ -844,6 +846,8 @@ class ContourEditor:
 
         if self.operational_image is None:
             return
+        
+        update_stats_field(STATS_FILENAME, "previous_annotator", self.annotator.get())
 
         info_path = f"{FOLDER_INFORMATION}/{self.image_name}.txt"
         self.save_image_info(info_path)
