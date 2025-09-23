@@ -121,9 +121,10 @@ class ContourEditor:
         self.exit_button = customtkinter.CTkButton(button_frame, text="Exit MedAP", font=(self.font_size,self.font_size), fg_color='red', hover_color="dark red", command=root.quit)
 
         self.undo_button = customtkinter.CTkButton(button_frame, text="Fix previous", font=(self.font_size,self.font_size), fg_color='medium slate blue', hover_color="dark slate blue", command=self.del_prev_image)
-        # self.annotator_dropdown = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
-        self.annotator = customtkinter.CTkEntry(button_frame, height=40, placeholder_text=stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
-        self.annotator.insert(0, stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
+        self.annotator = customtkinter.CTkOptionMenu(button_frame, values=DOCTORS_OPTIONS, command=annotator_menu_callback)
+        self.annotator.set(stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
+        # self.annotator = customtkinter.CTkEntry(button_frame, height=40, placeholder_text=stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
+        # self.annotator.insert(0, stats['previous_annotator'] if stats['previous_annotator'] else DOCTORS_OPTIONS[0])
         self.interesting_checkbox_value = False
         self.interesting_checkbox = customtkinter.CTkCheckBox(button_frame, text='Interesting')
 
