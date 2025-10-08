@@ -6,22 +6,25 @@
         </div>
         <div class="ann-ctrl-container">
             <div class="ann-ctrl-group">
-                <UButton variant="outline" label="Upload dataset"></UButton>
+                <p>#1/100</p>
+            </div>
+            <div class="ann-ctrl-group">
+                <AppUpload />
             </div>
             <div class="ann-ctrl-group">
                 <UButton v-if="sessionRunning" label="Stop" @click="toggleSession" color="error" variant="outline" />
                 <UButton v-else label="Start" @click="toggleSession" />
             </div>
             <UButton>Save (Enter)</UButton>
-            <UButton>Segment Image</UButton>
-            <UButton>Empty Segmentation</UButton>
-            <div class="ann-ctrl-group">
-                <UButton>Add points</UButton>
-                <UButton>Remove points</UButton>
-            </div>
+            <UButton>Segment Image (S)</UButton>
+            <UButton>Empty Segmentation (E)</UButton>
             <div class="ann-ctrl-group">
                 <UButton>Zoom in</UButton>
                 <UButton>Zoom out</UButton>
+            </div>
+            <!-- unnecessary as current user will be marked automatically -->
+            <div class="ann-ctrl-group">
+                <UInputMenu v-model="value" :items="items" />
             </div>
         </div>
     </div>
@@ -38,6 +41,9 @@ function toggleSession() {
 function fetchImage() {
     // load image if possible
 }
+
+const items = ref(['Ann1', 'Ann2', 'Ann3', 'Ann4'])
+const value = ref('Ann1')
 
 </script>
 
