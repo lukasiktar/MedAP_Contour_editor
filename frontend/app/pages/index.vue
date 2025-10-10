@@ -1,9 +1,23 @@
 <template>
-    
+
     <div class="ann-container my-4 px-2">
-        <div class="ann-img-container">
-            <img src="/data/image.png" />
-        </div>
+
+        <ClientOnly>
+            <div class="ann-img-container">
+                <!-- <img src="/data/image.png" /> -->
+                <!-- <div id="app">
+                    <canvas id="canvas"></canvas>
+                </div>   -->
+                <v-stage :config="stageConfig" @mousedown="handleMouseDown" @mousemove="handleMouseMove"
+                    @mouseup="handleMouseUp" @touchstart="handleMouseDown" @touchmove="handleMouseMove"
+                    @touchend="handleMouseUp">
+                    <v-layer ref="layerRef">
+                        <v-image ref="imageRef" :config="imageConfig" />
+                    </v-layer>
+                </v-stage>
+            </div>
+        </ClientOnly>
+
         <div class="ann-ctrl-container">
             <div class="ann-ctrl-group">
                 <p>#1/100</p>
@@ -27,6 +41,7 @@
                 <UInputMenu v-model="value" :items="items" />
             </div>
         </div>
+
     </div>
 </template>
 
@@ -38,12 +53,88 @@ function toggleSession() {
     sessionRunning.value = !sessionRunning.value
 }
 
-function fetchImage() {
-    // load image if possible
-}
+// function fetchImage() {
+//     // load image if possible
+// }
 
 const items = ref(['Ann1', 'Ann2', 'Ann3', 'Ann4'])
 const value = ref('Ann1')
+
+// bruhsing
+const tool = ref('brush');
+const isDrawing = ref(false);
+const lastPos = ref(null);
+const imageRef = ref(null);
+const layerRef = ref(null);
+
+const stageConfig = ref({ width: 0, height: 0 })
+const canvas = ref<HTMLCanvasElement | null>(null)
+const context = ref<CanvasRenderingContext2D | null>(null)
+const imageConfig = ref({ image: null as HTMLCanvasElement | null, x: 0, y: 0 })
+
+
+onMounted(() => {
+    const width = window.innerWidth * 0.85
+    const height = window.innerHeight * 0.9
+
+    stageConfig.value = { width, height }
+
+    // now safe: we are in the browser
+    canvas.value = document.createElement('canvas')
+    canvas.value.width = width
+    canvas.value.height = height
+
+    const ctx = canvas.value.getContext('2d')
+    if (!ctx) return
+
+    ctx.strokeStyle = '#df4b26'
+    ctx.lineJoin = 'round'
+    ctx.lineWidth = 5
+
+    context.value = ctx
+    imageConfig.value.image = canvas.value
+})
+
+const handleMouseDown = (e) => {
+    isDrawing.value = true;
+    console.log('draw')
+    lastPos.value = e.target.getStage().getPointerPosition();
+};
+
+const handleMouseUp = () => {
+    isDrawing.value = false;
+};
+
+const handleMouseMove = (e) => {
+  if (!isDrawing.value || !context.value || !canvas.value) return
+
+  const ctx = context.value
+  const image = imageRef.value.getNode()
+  const stage = e.target.getStage()
+
+  ctx.globalCompositeOperation =
+    tool.value === 'eraser' ? 'destination-out' : 'source-over'
+  ctx.beginPath()
+
+  const localPos = {
+    x: lastPos.value.x - image.x(),
+    y: lastPos.value.y - image.y(),
+  }
+  ctx.moveTo(localPos.x, localPos.y)
+
+  const pos = stage.getPointerPosition()
+  const newLocalPos = {
+    x: pos.x - image.x(),
+    y: pos.y - image.y(),
+  }
+  ctx.lineTo(newLocalPos.x, newLocalPos.y)
+  ctx.closePath()
+  ctx.stroke()
+
+  lastPos.value = pos
+  layerRef.value.getNode().batchDraw()
+}
+
 
 </script>
 
@@ -60,8 +151,10 @@ const value = ref('Ann1')
 }
 
 .ann-img-container {
+    height: 90vh;
     flex: 0 0 85%;
     display: flex;
+    border: 1px solid black;
 }
 
 .ann-img img {
