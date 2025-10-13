@@ -1,17 +1,14 @@
 <template>
 
-    <div class="ann-container my-4 px-2">
+    <div class="ann-container my-4 px-1">
 
         <ClientOnly>
             <div class="ann-img-container">
-                <!-- <img src="/data/image.png" /> -->
-                <!-- <div id="app">
-                    <canvas id="canvas"></canvas>
-                </div>   -->
                 <v-stage :config="stageConfig" @mousedown="handleMouseDown" @mousemove="handleMouseMove"
                     @mouseup="handleMouseUp" @touchstart="handleMouseDown" @touchmove="handleMouseMove"
                     @touchend="handleMouseUp">
                     <v-layer ref="layerRef">
+                        <v-image ref="backgroundRef" :config="backgroundConfig" />
                         <v-image ref="imageRef" :config="imageConfig" />
                     </v-layer>
                 </v-stage>
@@ -29,7 +26,10 @@
                 <UButton v-if="sessionRunning" label="Stop" @click="toggleSession" color="error" variant="outline" />
                 <UButton v-else label="Start" @click="toggleSession" />
             </div>
-            <UButton>Save (Enter)</UButton>
+            <div class="ann-ctrl-group">
+                <UButton>Clear (C)</UButton>
+                <UButton>Save (Enter)</UButton>
+            </div>
             <UButton>Segment Image (S)</UButton>
             <UButton>Empty Segmentation (E)</UButton>
             <div class="ann-ctrl-group">
@@ -53,9 +53,9 @@ function toggleSession() {
     sessionRunning.value = !sessionRunning.value
 }
 
-// function fetchImage() {
-//     // load image if possible
-// }
+const backgroundRef = ref(null)
+const backgroundImage = ref<HTMLImageElement | null>(null)
+const backgroundConfig = ref({ image: null as HTMLImageElement | null, x: 0, y: 0, scaleX: 1, scaleY: 1 })
 
 const items = ref(['Ann1', 'Ann2', 'Ann3', 'Ann4'])
 const value = ref('Ann1')
@@ -72,6 +72,39 @@ const canvas = ref<HTMLCanvasElement | null>(null)
 const context = ref<CanvasRenderingContext2D | null>(null)
 const imageConfig = ref({ image: null as HTMLCanvasElement | null, x: 0, y: 0 })
 
+const loadBackground = (path: string) => {
+    // prevent running on server
+    // if (process.server) return
+
+    const img = new Image()
+
+    // attach handler before setting src -> prevents race conditions
+    img.addEventListener('load', () => {
+        backgroundImage.value = img
+
+        const width = stageConfig.value.width
+        const height = stageConfig.value.height
+
+        const scale = Math.min(width / img.width, height / img.height)
+
+        backgroundConfig.value = {
+            image: img,
+            x: 0,
+            y: 0,
+            scaleX: scale,
+            scaleY: scale,
+        }
+
+        // redraw konva layer if available
+        // layerRef.value?.getNode()?.batchDraw()
+    })
+
+    img.addEventListener('error', (err) => {
+        console.error('Failed to load image', err)
+    })
+
+    img.src = path
+}
 
 onMounted(() => {
     const width = window.innerWidth * 0.85
@@ -93,7 +126,10 @@ onMounted(() => {
 
     context.value = ctx
     imageConfig.value.image = canvas.value
+
+    loadBackground('/data/image.png')
 })
+
 
 const handleMouseDown = (e) => {
     isDrawing.value = true;
@@ -106,35 +142,39 @@ const handleMouseUp = () => {
 };
 
 const handleMouseMove = (e) => {
-  if (!isDrawing.value || !context.value || !canvas.value) return
+    if (!isDrawing.value || !context.value || !canvas.value) return
 
-  const ctx = context.value
-  const image = imageRef.value.getNode()
-  const stage = e.target.getStage()
+    const ctx = context.value
+    const image = imageRef.value.getNode()
+    const stage = e.target.getStage()
 
-  ctx.globalCompositeOperation =
-    tool.value === 'eraser' ? 'destination-out' : 'source-over'
-  ctx.beginPath()
+    ctx.globalCompositeOperation =
+        tool.value === 'eraser' ? 'destination-out' : 'source-over'
+    ctx.beginPath()
 
-  const localPos = {
-    x: lastPos.value.x - image.x(),
-    y: lastPos.value.y - image.y(),
-  }
-  ctx.moveTo(localPos.x, localPos.y)
+    const localPos = {
+        x: lastPos.value.x - image.x(),
+        y: lastPos.value.y - image.y(),
+    }
+    ctx.moveTo(localPos.x, localPos.y)
 
-  const pos = stage.getPointerPosition()
-  const newLocalPos = {
-    x: pos.x - image.x(),
-    y: pos.y - image.y(),
-  }
-  ctx.lineTo(newLocalPos.x, newLocalPos.y)
-  ctx.closePath()
-  ctx.stroke()
+    const pos = stage.getPointerPosition()
+    const newLocalPos = {
+        x: pos.x - image.x(),
+        y: pos.y - image.y(),
+    }
+    ctx.lineTo(newLocalPos.x, newLocalPos.y)
+    ctx.closePath()
+    ctx.stroke()
 
-  lastPos.value = pos
-  layerRef.value.getNode().batchDraw()
+    lastPos.value = pos
+    layerRef.value.getNode().batchDraw()
 }
 
+const eraseAnnotation = () => {
+    // TODO
+    layerRef = null;
+}
 
 </script>
 
@@ -154,7 +194,6 @@ const handleMouseMove = (e) => {
     height: 90vh;
     flex: 0 0 85%;
     display: flex;
-    border: 1px solid black;
 }
 
 .ann-img img {
